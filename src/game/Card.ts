@@ -1,29 +1,33 @@
+import { Environment } from "../shared/constants";
 import { Color, Faction, Rarity } from "../shared/enums";
-import { Ability } from "../shared/interfaces";
+import { Ability, ICard } from "../shared/interfaces";
 
 export class Card {
-  private _name: string;
-  private _attack: number;
-  private _health: number;
-  private _faction: Faction;
-  private _rarity: Rarity;
-  private _color: Color;
-  private _imagePath: string;
+  protected _name: string;
+  protected _attack: number;
+  protected _health: number;
+  protected _faction: Faction;
+  protected _rarity: Rarity;
+  protected _color: Color;
+  protected _cover: string;
   private _ability?: Ability;
 
-  constructor(name: string, attack: number, health: number, faction: Faction, rarity: Rarity, color: Color, imagePath: string, ability?: Ability) {
-    this._name = name;
-    this._attack = attack;
-    this._health = health;
-    this._faction = faction;
-    this._rarity = rarity;
-    this._color = color;
-    this._imagePath = imagePath;
-    this._ability = ability;
+  constructor(options: ICard) {
+    this._name = options.name;
+    this._cover = options.cover;
+    this._attack = options.attack;
+    this._health = options.health;
+    this._faction = options.faction;
+    this._rarity = options.rarity;
+    this._color = options.color;
+    this._ability = options.ability;
   }
 
   public get Name(): string {
     return this._name;
+  }
+  public get Cover(): string {
+    return this._cover;
   }
   public get Attack(): number {
     return this._attack;
@@ -46,9 +50,6 @@ export class Card {
   public get Color(): Color {
     return this._color;
   }
-  public get ImagePath(): string {
-    return this._imagePath;
-  }
   public get Ability(): Ability | undefined {
     return this._ability;
   }
@@ -56,23 +57,30 @@ export class Card {
 
 export class LeaderCard extends Card {
   private _leaderAbility: Ability;
+  private _crown: string;
 
   constructor(
     name: string,
+    cover: string,
     attack: number,
     health: number,
     faction: Faction,
     rarity: Rarity,
     color: Color,
     leaderAbility: Ability,
-    imagePath: string
+    crown: string = Environment.crown
   ) {
-    super(name, attack, health, faction, rarity, color, imagePath, leaderAbility);
+    super({ name, cover, attack, health, faction, rarity, color });
     this._leaderAbility = leaderAbility;
+    this._crown = crown;
   }
 
   public get LeaderAbility(): Ability {
     return this._leaderAbility;
+  }
+
+  public get Crown(): string {
+    return this._crown;
   }
 }
 

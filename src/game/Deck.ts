@@ -28,7 +28,7 @@ export class Deck {
     const otherCards = this.cards.filter((c) => c !== this.leader);
 
     if (this.cards.length >= 5) {
-      // Rastgele 4 kart seç, liderle birlikte 5 olsun
+      // Draw 4 random cards from the deck, excluding the leader
       const shuffled = otherCards.sort(() => Math.random() - 0.5);
       hand = hand.concat(shuffled.slice(0, 4));
     } else {
@@ -38,11 +38,14 @@ export class Deck {
     return hand;
   }
 
-  drawRandomCard(exclude: Card[] = []): Card | null {
-    const available = this.cards.filter((c) => !exclude.includes(c));
-
+  drawRandomCard(): Card | null {
+    // Draw a random card from the deck, excluding the leader
+    const available = this.cards.filter((c) => c !== this.leader);
     if (available.length === 0) return null;
-
-    return available[Math.floor(Math.random() * available.length)];
+    const idx = Math.floor(Math.random() * available.length);
+    const card = available[idx];
+    // Remove the card from the deck
+    this.cards = this.cards.filter((c) => c !== card);
+    return card;
   }
 }

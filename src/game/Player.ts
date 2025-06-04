@@ -20,19 +20,17 @@ export class Player {
 
   drawCard() {
     if (this.hand.length >= 5) return;
-
-    const exclude = this.hand;
-    const card = this.deck.drawRandomCard(exclude);
-    
+    // Draw a random card from the deck
+    const card = this.deck.drawRandomCard();
     if (card) this.hand.push(card);
   }
 
   playTurn(game: Game, _opponent: Player) {
-    // Basit örnek: ilk kartı oynar
+    // Simple example: play the first card
     const card = this.hand[0];
-    // Kartın yeteneği varsa aktive et
+    // Activate the card's ability if it exists
     if (card.Ability) card.Ability.activate(card, this, game);
-    // Oynanan kartı elden çıkar
+    // Remove the played card from hand
     this.hand.splice(0, 1);
   }
 }

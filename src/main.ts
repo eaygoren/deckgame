@@ -1,18 +1,39 @@
 import { Application } from "pixi.js";
-import { GameUI } from "./ui/GameUI";
-import { AssetLoader } from "./AssetLoader";
+import { AssetLoader } from "./utils/AssetLoader";
+import { Game } from "./game/Game";
 
-const app = new Application({
-  width: 1920,
-  height: 1080,
-  background: "#222244",
-});
-
-const gameUI = new GameUI(app);
+const app = new Application();
 
 (async () => {
   await AssetLoader.loadAll();
-  await app.init();
+  await app.init({
+    width: 1920,
+    height: 1080,
+    resolution: 1,
+    backgroundColor: 0xfafafa,
+    resizeTo: window,
+  });
+
+  (globalThis as any).__PIXI_APP__ = app;
+
   document.getElementById("pixi-container")?.appendChild(app.canvas);
-  gameUI.init();
+  
+  // Update scale function to fit the game area
+  function updateScale() {
+    const scaleX = window.innerWidth / 1920;
+    const scaleY = window.innerHeight / 1080;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Scale and center the stage
+    app.stage.scale.set(scale);
+    app.stage.position.set(
+      (window.innerWidth - 1920 * scale) / 2,
+      (window.innerHeight - 1080 * scale) / 2
+    );
+  }
+  
+  window.addEventListener("resize", updateScale);
+  updateScale();
+  // Start the game
+  new Game(app).start();
 })();
