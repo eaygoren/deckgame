@@ -13,8 +13,12 @@ export enum Rarity {
     Leader = "Leader",
 }
 export enum Color {
-    Common = 0xffbbcc,
+    Common = 0x696969,
     Rare = 0x3399ff,
     Legendary = 0xff9900,
-    Leader = 0x44ff44,
+    Leader = 0xff0000,
+}
+export enum Class {
+    Melee = "Melee",
+    Ranged = "Ranged",
 }

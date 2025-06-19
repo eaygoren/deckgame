@@ -1,6 +1,6 @@
 import { Environment } from "../shared/constants";
-import { Color, Faction, Rarity } from "../shared/enums";
-import { Ability, ICard } from "../shared/interfaces";
+import { Color, Faction, Rarity, Class } from "../shared/enums";
+import { IAbility, ICard } from "../shared/interfaces";
 
 export class Card {
   protected _name: string;
@@ -10,9 +10,8 @@ export class Card {
   protected _rarity: Rarity;
   protected _color: Color;
   protected _cover: string;
-  private _ability?: Ability;
-
-  constructor(options: ICard) {
+  protected _class: Class;
+  private _ability?: IAbility; constructor(options: ICard) {
     this._name = options.name;
     this._cover = options.cover;
     this._attack = options.attack;
@@ -20,6 +19,7 @@ export class Card {
     this._faction = options.faction;
     this._rarity = options.rarity;
     this._color = options.color;
+    this._class = options.class;
     this._ability = options.ability;
   }
 
@@ -50,16 +50,17 @@ export class Card {
   public get Color(): Color {
     return this._color;
   }
-  public get Ability(): Ability | undefined {
+  public get Class(): Class {
+    return this._class;
+  }
+  public get Ability(): IAbility | undefined {
     return this._ability;
   }
 }
 
 export class LeaderCard extends Card {
-  private _leaderAbility: Ability;
-  private _crown: string;
-
-  constructor(
+  private _leaderAbility: IAbility;
+  private _crown: string; constructor(
     name: string,
     cover: string,
     attack: number,
@@ -67,15 +68,16 @@ export class LeaderCard extends Card {
     faction: Faction,
     rarity: Rarity,
     color: Color,
-    leaderAbility: Ability,
+    cardClass: Class,
+    leaderAbility: IAbility,
     crown: string = Environment.crown
   ) {
-    super({ name, cover, attack, health, faction, rarity, color });
+    super({ name, cover, attack, health, faction, rarity, color, class: cardClass });
     this._leaderAbility = leaderAbility;
     this._crown = crown;
   }
 
-  public get LeaderAbility(): Ability {
+  public get LeaderAbility(): IAbility {
     return this._leaderAbility;
   }
 
@@ -84,5 +86,5 @@ export class LeaderCard extends Card {
   }
 }
 
-export { Rarity, Faction, Color };
-export type { Ability };
+export { Rarity, Faction, Color, Class };
+export type { IAbility as Ability };

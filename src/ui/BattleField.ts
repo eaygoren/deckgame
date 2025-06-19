@@ -33,4 +33,13 @@ export class BattleField extends Container {
         this.botDeckText.anchor.set?.(0.5, 0.5);
         this.addChild(this.botDeckText);
     }
+
+    public updateDeckCounts(playerCount: number, botCount: number) {
+        if (this.playerDeckText) {
+            this.playerDeckText.text = `Destede: ${playerCount} kart`;
+        }
+        if (this.botDeckText) {
+            this.botDeckText.text = `Destede: ${botCount} kart`;
+        }
+    }
 }

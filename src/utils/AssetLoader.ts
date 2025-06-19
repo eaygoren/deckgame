@@ -5,12 +5,12 @@ export class AssetLoader {
   static async loadAll(): Promise<void> {
     const chars = Object.values(CharacterSource).map((alias) => ({
       alias,
-      src: `assets/${alias}.png`
+      src: `assets/characters/${alias}.png`
     }));
 
     const env = Object.values(Environment).map((alias) => ({
       alias,
-      src: `assets/${alias}.png`
+      src: `assets/environment/${alias}.png`
     }));
 
     await Assets.load(chars);

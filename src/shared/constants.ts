@@ -1,36 +1,54 @@
-import { Card, Color, Faction, Rarity } from "../game/Card";
+import { Card, Color, Faction, Rarity, Class } from "../game/Card";
 import { Player } from "../game/Player";
-import { Ability } from "./interfaces";
+import { IAbility } from "./interfaces";
 
 export const CharacterNames = {
+    Aerwyn: "Aerwyn",
     Assassin: "Assassin",
     Cerberus: "Cerberus",
     Dragon: "Dragon",
     Elf: "Elf",
+    Ent: "Ent",
+    Ixelis: "Ixelis",
     Knight: "Knight",
     Mage: "Mage",
     Ra: "Ra",
+    Samurai: "Samurai",
     Siren: "Siren",
-    Werewolf: "Werewolf",
     Vampire: "Vampire",
+    Werewolf: "Werewolf",
     Zombie: "Zombie",
 }
 
 export const CharacterSource = {
+    Aerwyn: "aerwyn",
     Assassin: "assassin",
     Cerberus: "cerberus",
     Dragon: "dragon",
     Elf: "elf",
+    Ent: "ent",
+    Ixelis: "ixelis",
     Knight: "knight",
     Mage: "mage",
     Ra: "ra",
     Siren: "siren",
-    Werewolf: "werewolf",
+    Samurai: "samurai",
     Vampire: "vampire",
+    Werewolf: "werewolf",
     Zombie: "zombie",
 }
 
 export const CharacterList = {
+    Aerwyn: {
+        name: CharacterNames.Aerwyn,
+        cover: CharacterSource.Aerwyn,
+        attack: 6,
+        health: 8,
+        faction: Faction.Forest,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        class: Class.Ranged,
+    },
     Assassin: {
         name: CharacterNames.Assassin,
         cover: CharacterSource.Assassin,
@@ -39,6 +57,7 @@ export const CharacterList = {
         faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
+        class: Class.Melee,
     },
     Cerberus: {
         name: CharacterNames.Cerberus,
@@ -48,24 +67,47 @@ export const CharacterList = {
         faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
+        class: Class.Melee,
     },
     Dragon: {
         name: CharacterNames.Dragon,
         cover: CharacterSource.Dragon,
-        attack: 9,
-        health: 6,
+        attack: 7, // Reduced from 9 (ranged penalty)
+        health: 4, // Reduced from 6 (ranged penalty)
         faction: Faction.Forest,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
+        class: Class.Ranged,
     },
     Elf: {
         name: CharacterNames.Elf,
         cover: CharacterSource.Elf,
-        attack: 4,
-        health: 9,
+        attack: 3, // Reduced from 4 (ranged penalty)
+        health: 7, // Reduced from 9 (ranged penalty)
         faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
+        class: Class.Ranged,
+    },
+    Ent: {
+        name: CharacterNames.Ent,
+        cover: CharacterSource.Ent,
+        attack: 4,
+        health: 10,
+        faction: Faction.Forest,
+        rarity: Rarity.Common,
+        color: Color.Common,
+        class: Class.Melee,
+    },
+    Ixelis: {
+        name: CharacterNames.Ixelis,
+        cover: CharacterSource.Ixelis,
+        attack: 8,
+        health: 6,
+        faction: Faction.Forest,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        class: Class.Ranged,
     },
     Knight: {
         name: CharacterNames.Knight,
@@ -75,15 +117,17 @@ export const CharacterList = {
         faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
+        class: Class.Melee,
     },
     Mage: {
         name: CharacterNames.Mage,
         cover: CharacterSource.Mage,
-        attack: 7,
-        health: 8,
+        attack: 5, // Reduced from 7 (ranged penalty)
+        health: 6, // Reduced from 8 (ranged penalty)
         faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
+        class: Class.Ranged,
     },
     Ra: {
         name: CharacterNames.Ra,
@@ -93,24 +137,27 @@ export const CharacterList = {
         faction: Faction.Empire,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
+        class: Class.Melee,
+    },
+    Samurai: {
+        name: CharacterNames.Samurai,
+        cover: CharacterSource.Samurai,
+        attack: 8,
+        health: 9,
+        faction: Faction.Empire,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
+        class: Class.Melee,
     },
     Siren: {
         name: CharacterNames.Siren,
         cover: CharacterSource.Siren,
-        attack: 6,
-        health: 8,
+        attack: 4, // Reduced from 6 (ranged penalty)
+        health: 6, // Reduced from 8 (ranged penalty)
         faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
-    },
-    Werewolf: {
-        name: CharacterNames.Werewolf,
-        cover: CharacterSource.Werewolf,
-        attack: 7,
-        health: 6,
-        faction: Faction.Empire,
-        rarity: Rarity.Common,
-        color: Color.Common,
+        class: Class.Ranged,
     },
     Vampire: {
         name: CharacterNames.Vampire,
@@ -120,6 +167,17 @@ export const CharacterList = {
         faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
+        class: Class.Melee,
+    },
+    Werewolf: {
+        name: CharacterNames.Werewolf,
+        cover: CharacterSource.Werewolf,
+        attack: 7,
+        health: 6,
+        faction: Faction.Empire,
+        rarity: Rarity.Common,
+        color: Color.Common,
+        class: Class.Melee,
     },
     Zombie: {
         name: CharacterNames.Zombie,
@@ -129,10 +187,11 @@ export const CharacterList = {
         faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
+        class: Class.Melee,
     },
 }
 
-export const CommonDeathAbility: Ability = {
+export const CommonDeathAbility: IAbility = {
     name: "Death Transfer",
     description: "When this card death, transfer 20% of its attack to a random card in your hand.",
     activate(card: Card, owner: Player) {
@@ -143,7 +202,7 @@ export const CommonDeathAbility: Ability = {
     },
 };
 
-export const LegendaryEntryAbility: Ability = {
+export const LegendaryEntryAbility: IAbility = {
     name: "Legendary Entry",
     description: "When this card enters the game, increase all cards' health in your hand by 50% of this card's health.",
     activate(card: Card, owner: Player) {
@@ -153,7 +212,7 @@ export const LegendaryEntryAbility: Ability = {
     },
 };
 
-export const LeaderBoostAbility: Ability = {
+export const LeaderBoostAbility: IAbility = {
     name: "Leader Boost",
     description: "Increase all your team members' stats by 1.",
     activate(card: Card, owner: Player) {
@@ -168,4 +227,6 @@ export const LeaderBoostAbility: Ability = {
 
 export const Environment = {
     crown: "crown",
+    melee: "melee",
+    ranged: "ranged",
 }

@@ -1,8 +1,8 @@
-import { Card, Color, Faction, Rarity } from "../game/Card";
+import { Card, Color, Faction, Rarity, Class } from "../game/Card";
 import { Game } from "../game/Game";
 import { Player } from "../game/Player";
 
-export interface Ability {
+export interface IAbility {
   name: string;
   description: string;
   activate(card: Card, owner: Player, game?: Game): void;
@@ -16,6 +16,13 @@ export interface ICard {
   faction: Faction;
   rarity: Rarity;
   color: Color;
-  ability?: Ability;
+  class: Class;
+  ability?: IAbility;
   crown?: string;
+}
+
+export interface MoveOption {
+  attacker: Card;
+  defender: Card;
+  score: number;
 }
