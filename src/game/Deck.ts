@@ -1,51 +1,70 @@
 import { Card, LeaderCard } from "./Card";
 
 export class Deck {
-  cards: Card[] = [];
-  leader: LeaderCard | null = null;
-  maxCards: number = 10;
+  private _cards: Card[] = [];
+  private _leader: LeaderCard | null = null;
+  private _maxCards: number = 10;
 
-  addCard(card: Card) {
-    if (this.cards.length < this.maxCards) {
-      this.cards.push(card);
+  public addCard(card: Card) {
+    if (this._cards.length < this._maxCards) {
+      this._cards.push(card);
     } else {
       throw new Error("Deck is full");
     }
   }
 
-  setLeader(leader: LeaderCard) {
-    this.leader = leader;
+  public setLeader(leader: LeaderCard) {
+    this._leader = leader;
     
-    if (!this.cards.includes(leader)) {
+    if (!this._cards.includes(leader)) {
       this.addCard(leader);
     }
   }
 
-  getPlayableHand(): Card[] {
-    if (!this.leader) throw new Error("Leader not set");
+  public getPlayableHand(): Card[] {
+    if (!this._leader) throw new Error("Leader not set");
 
-    let hand: Card[] = [this.leader];
-    const otherCards = this.cards.filter((c) => c !== this.leader);
+    let hand: Card[] = [this._leader];
+    const otherCards = this._cards.filter((c) => c !== this._leader);
 
-    if (this.cards.length >= 5) {
+    if (this._cards.length >= 5) {
       // Draw 4 random cards from the deck, excluding the leader
       const shuffled = otherCards.sort(() => Math.random() - 0.5);
       hand = hand.concat(shuffled.slice(0, 4));
     } else {
-      hand = this.cards;
+      hand = this._cards;
     }
 
     return hand;
   }
 
-  drawRandomCard(): Card | null {
+  public drawRandomCard(): Card | null {
     // Draw a random card from the deck, excluding the leader
-    const available = this.cards.filter((c) => c !== this.leader);
+    const available = this._cards.filter((c) => c !== this._leader);
     if (available.length === 0) return null;
     const idx = Math.floor(Math.random() * available.length);
     const card = available[idx];
     // Remove the card from the deck
-    this.cards = this.cards.filter((c) => c !== card);
+    this._cards = this._cards.filter((c) => c !== card);
     return card;
+  }
+
+  public get cards(): Card[] {
+    return this._cards;
+  }
+
+  public set cards(value: Card[]) {
+    if (value.length > this._maxCards) {
+      throw new Error("Deck cannot have more than " + this._maxCards + " cards");
+    }
+    this._cards = value;
+  }
+
+  public get leader(): LeaderCard | null {
+    return this._leader;
+  }
+
+  public drawCard(): Card | null {
+    return this.drawRandomCard();
   }
 }

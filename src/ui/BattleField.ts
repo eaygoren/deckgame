@@ -42,4 +42,16 @@ export class BattleField extends Container {
             this.botDeckText.text = `Destede: ${botCount} kart`;
         }
     }
+
+    public getCardPosition(index: number, isPlayer: boolean): { x: number, y: number } {
+        const cardSpacing = 280;
+        const startX = 200;
+        const playerY = 600;
+        const botY = 300;
+
+        return {
+            x: startX + (index * cardSpacing),
+            y: isPlayer ? playerY : botY
+        };
+    }
 }

@@ -1,10 +1,11 @@
 import { Container, Graphics, Sprite, Text } from "pixi.js";
-import { Card, Class, Color, LeaderCard } from "../game/Card";
+import { Card, AttackType, Color, LeaderCard } from "../game/Card";
 import { Environment } from "../shared/constants";
+import { ClassType } from "../shared/enums";
 
 export class CardView extends Container {
   private _card: Card;
-  private statText: Text | undefined; // Stat text reference
+  private _statText: Text | undefined; // Stat text reference
 
   constructor(card: Card) {
     super();
@@ -12,6 +13,10 @@ export class CardView extends Container {
     this.label = card.Name;
     this.interactive = true;
     this.drawCard();
+  }
+
+  public get card(): Card {
+    return this._card;
   }
 
   private drawCard() {
@@ -41,7 +46,7 @@ export class CardView extends Container {
       sprite.label = "Cover";
       this.addChild(sprite);
     }
-    
+
     if (this._card instanceof LeaderCard) {
       const crown = Sprite.from(this._card.Crown);
       crown.anchor.set(0.5, 0);
@@ -50,49 +55,63 @@ export class CardView extends Container {
       crown.angle = 30;
       crown.label = "Crown";
       this.addChild(crown);
-    }
-
-    let classIcon: string;
-    switch (this._card.Class) {
-      case Class.Melee:
-        classIcon = Environment.melee;
+    }    let attackTypeIcon: string = "";
+    switch (this._card.AttackType) {
+      case AttackType.Melee:
+        attackTypeIcon = Environment.melee;
         break;
-      case Class.Ranged:
-        classIcon = Environment.ranged;
+      case AttackType.Ranged:
+        attackTypeIcon = Environment.ranged;
         break;
     }
-    if (classIcon) {
-      const classSprite = Sprite.from(classIcon);
-      classSprite.anchor.set(0.5, 0.5);
-      classSprite.scale.set(0.075);
-      classSprite.position.set(-90, -90);
-      classSprite.label = "ClassIcon";
-      this.addChild(classSprite);
+    if (attackTypeIcon) {
+      const attackTypeSprite = Sprite.from(attackTypeIcon);
+      attackTypeSprite.anchor.set(0.5, 0.5);
+      attackTypeSprite.scale.set(0.075);
+      attackTypeSprite.position.set(-90, -90);
+      attackTypeSprite.label = "AttackTypeIcon";
+      this.addChild(attackTypeSprite);
     }
 
-    const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: (this._card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
+    // Add ClassType text indicator
+    const classTypeText = new Text({ 
+      text: this._card.ClassType, 
+      style: { 
+        fontSize: 12, 
+        fill: 0xFFFFFF,
+        fontWeight: "bold"
+      } 
+    });
+    classTypeText.anchor.set(0.5);
+    classTypeText.position.set(90, -90);
+    classTypeText.label = "ClassType";
+    this.addChild(classTypeText);    const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: (this._card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
     nameText.anchor.set(0.5);
     nameText.position.set(0, 190);
     nameText.style.fontWeight = "bold";
     nameText.label = "Name";
     this.addChild(nameText);
-    
-    this.statText = new Text({ text: `A:${this._card.Attack} H:${this._card.Health}`, style: { fontSize: 20, fill: (this._card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
-    this.statText.anchor.set(0.5);
-    this.statText.position.set(0, 220);
-    this.statText.style.fontWeight = "bold";
-    this.statText.label = "Stats";
-    this.addChild(this.statText);
-  }
 
-  // Update method to refresh stats
-  public update(attack?: number, health?: number) {
-    if (this.statText) {
-      this.statText.text = `A:${attack !== undefined ? attack : this.card.Attack} H:${health !== undefined ? health : this.card.Health}`;
+    this.update();
+  }
+    // Update method to refresh stats
+  public update() {
+    if (this._statText) {
+      this._statText.destroy(); // Remove old stat text
+    }    // Special display for warrior with rage bonus
+    let attackText = `A: ${this._card.Attack}`;
+    if (this._card.ClassType === ClassType.Warrior && this._card.WarriorRageActivated) {
+      // Calculate the original attack value (before rage bonus)
+      const originalAttack = Math.floor(this._card.Attack / 1.5);
+      const bonus = this._card.Attack - originalAttack;
+      attackText = `A: ${originalAttack} + (${bonus})`;
     }
-  }
 
-  public get card(): Card {
-    return this._card;
+    this._statText = new Text({ text: `${attackText} H: ${this._card.Health}`, style: { fontSize: 20, fill: (this.card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
+    this._statText.anchor.set(0.5);
+    this._statText.position.set(0, 220);
+    this._statText.style.fontWeight = "bold";
+    this._statText.label = "Stats";
+    this.addChild(this._statText);
   }
 }

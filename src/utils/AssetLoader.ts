@@ -2,7 +2,7 @@ import { Assets } from "pixi.js";
 import { CharacterSource, Environment } from "../shared/constants";
 
 export class AssetLoader {
-  static async loadAll(): Promise<void> {
+  public static async loadAll(): Promise<void> {
     const chars = Object.values(CharacterSource).map((alias) => ({
       alias,
       src: `assets/characters/${alias}.png`
