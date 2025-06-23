@@ -5,6 +5,7 @@ import { ClassType } from "../shared/enums";
 
 export class CardView extends Container {
   private _card: Card;
+  private _cardContainer: Container; // Container for the card
   private _statText: Text | undefined; // Stat text reference
 
   constructor(card: Card) {
@@ -12,6 +13,11 @@ export class CardView extends Container {
     this._card = card;
     this.label = card.Name;
     this.interactive = true;
+
+    // Create a container for the card
+    this._cardContainer = new Container();
+    this.addChild(this._cardContainer);
+
     this.drawCard();
   }
 
@@ -20,42 +26,41 @@ export class CardView extends Container {
   }
 
   private drawCard() {
+    const mask = new Graphics();
+    mask.beginPath();
+    mask.roundRect(-125, -125, 250, 370, 20);
+    mask.fill({ color: 0x000000, alpha: 0.75 });
+    mask.closePath();
+    mask.label = "Mask";
+    this._cardContainer.addChild(mask);
+
+    const sprite = Sprite.from(this._card.Cover);
+    sprite.anchor.set(0.5, 1);
+    sprite.scale.set(1);
+    sprite.position.set(0, 245);
+    sprite.label = "Cover";
+    this._cardContainer.addChild(sprite);
+
     const background = new Graphics();
     background.beginPath();
-    background.roundRect(-125, -125, 250, 370, 10);
+    background.roundRect(-125, -125, 250, 370, 20);
     background.stroke({ color: 0x000000, width: 6 });
-    background.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.Color, alpha: 0.75 });
+    background.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.Color, alpha: 0 });
     background.closePath();
     background.label = "Background";
-    this.addChild(background);
+    this._cardContainer.addChild(background);
 
     const seperator = new Graphics();
     seperator.beginPath();
-    seperator.moveTo(-125, 170);
-    seperator.lineTo(125, 170);
-    seperator.stroke({ color: 0x000000, width: 4, alpha: 0.75 });
+    seperator.rect(-130, 170, 260, 80);
+    seperator.stroke({ color: 0x000000, width: 3 });
+    seperator.fill({ color: 0x000000, alpha: 0.5 });
     seperator.closePath();
-    seperator.label = "Sperator";
-    this.addChild(seperator);
+    seperator.label = "Seperator";
+    this._cardContainer.addChild(seperator);
+    this._cardContainer.mask = mask;
 
-    if (this._card.Cover) {
-      const sprite = Sprite.from(this._card.Cover);
-      sprite.anchor.set(0.5, 1);
-      sprite.scale.set(0.2);
-      sprite.position.set(0, 160);
-      sprite.label = "Cover";
-      this.addChild(sprite);
-    }
-
-    if (this._card instanceof LeaderCard) {
-      const crown = Sprite.from(this._card.Crown);
-      crown.anchor.set(0.5, 0);
-      crown.scale.set(0.1);
-      crown.position.set(130, -173);
-      crown.angle = 30;
-      crown.label = "Crown";
-      this.addChild(crown);
-    }    let attackTypeIcon: string = "";
+    let attackTypeIcon: string = "";
     switch (this._card.AttackType) {
       case AttackType.Melee:
         attackTypeIcon = Environment.melee;
@@ -64,41 +69,66 @@ export class CardView extends Container {
         attackTypeIcon = Environment.ranged;
         break;
     }
+
     if (attackTypeIcon) {
       const attackTypeSprite = Sprite.from(attackTypeIcon);
       attackTypeSprite.anchor.set(0.5, 0.5);
-      attackTypeSprite.scale.set(0.075);
-      attackTypeSprite.position.set(-90, -90);
+      attackTypeSprite.scale.set(1);
+      attackTypeSprite.position.set(-90, 207);
       attackTypeSprite.label = "AttackTypeIcon";
       this.addChild(attackTypeSprite);
     }
 
-    // Add ClassType text indicator
-    const classTypeText = new Text({ 
-      text: this._card.ClassType, 
-      style: { 
-        fontSize: 12, 
-        fill: 0xFFFFFF,
-        fontWeight: "bold"
-      } 
-    });
-    classTypeText.anchor.set(0.5);
-    classTypeText.position.set(90, -90);
-    classTypeText.label = "ClassType";
-    this.addChild(classTypeText);    const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: (this._card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
+    let classTypeIcon: string = "";
+    switch (this._card.ClassType) {
+      case ClassType.Tank:
+        classTypeIcon = Environment.tank;
+        break;
+      case ClassType.Warrior:
+        classTypeIcon = Environment.warrior;
+        break;
+      case ClassType.Mage:
+        classTypeIcon = Environment.mage;
+        break;
+      case ClassType.Rogue:
+        classTypeIcon = Environment.rogue;
+        break;
+    }
+
+    if (classTypeIcon) {
+      const classTypeSprite = Sprite.from(classTypeIcon);
+      classTypeSprite.anchor.set(0.5, 0.5);
+      classTypeSprite.scale.set(1);
+      classTypeSprite.position.set(90, 207);
+      classTypeSprite.label = "ClassTypeIcon";
+      this.addChild(classTypeSprite);
+    }
+
+    const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: 0xfafafa } });
     nameText.anchor.set(0.5);
     nameText.position.set(0, 190);
-    nameText.style.fontWeight = "bold";
     nameText.label = "Name";
     this.addChild(nameText);
 
+    if (this._card instanceof LeaderCard) {
+      const crown = Sprite.from(this._card.Crown);
+      crown.anchor.set(0.5, 0);
+      crown.scale.set(0.1);
+      crown.position.set(105, -187);
+      crown.angle = 15;
+      crown.label = "Crown";
+      this.addChild(crown);
+    }
+
     this.update();
   }
-    // Update method to refresh stats
+
+  // Update method to refresh stats
   public update() {
     if (this._statText) {
       this._statText.destroy(); // Remove old stat text
-    }    // Special display for warrior with rage bonus
+    }
+    // Special display for warrior with rage bonus
     let attackText = `A: ${this._card.Attack}`;
     if (this._card.ClassType === ClassType.Warrior && this._card.WarriorRageActivated) {
       // Calculate the original attack value (before rage bonus)
@@ -107,10 +137,9 @@ export class CardView extends Container {
       attackText = `A: ${originalAttack} + (${bonus})`;
     }
 
-    this._statText = new Text({ text: `${attackText} H: ${this._card.Health}`, style: { fontSize: 20, fill: (this.card instanceof LeaderCard) ? 0x000000 : 0x555555 } });
+    this._statText = new Text({ text: `${attackText} H: ${this._card.Health}`, style: { fontSize: 20, fill: 0xfafafa } });
     this._statText.anchor.set(0.5);
     this._statText.position.set(0, 220);
-    this._statText.style.fontWeight = "bold";
     this._statText.label = "Stats";
     this.addChild(this._statText);
   }

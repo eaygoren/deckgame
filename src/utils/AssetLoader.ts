@@ -5,7 +5,7 @@ export class AssetLoader {
   public static async loadAll(): Promise<void> {
     const chars = Object.values(CharacterSource).map((alias) => ({
       alias,
-      src: `assets/characters/${alias}.png`
+      src: `assets/character/${alias}.png`
     }));
 
     const env = Object.values(Environment).map((alias) => ({

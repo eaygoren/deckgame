@@ -1,5 +1,4 @@
 import { Card, Color, Faction, Rarity, AttackType } from "../game/Card";
-import { Game } from "../game/Game";
 import { Player } from "../game/Player";
 import { CardView } from "../ui/CardView";
 import { ClassType } from "./enums";
@@ -7,11 +6,6 @@ import { ClassType } from "./enums";
 export interface IAbility {
   name: string;
   description: string;
-  activate(card: Card, owner: Player, game?: Game): void;
-  // Combat abilities
-  modifyAttackDamage?(attacker: Card, defender: Card, baseDamage: number, gameInstance?: any): number;
-  modifyDefenseDamage?(attacker: Card, defender: Card, baseDamage: number, gameInstance?: any): number;
-  onPostAttack?(attacker: Card, defender: Card, game: any): void;
 }
 
 export interface ICard {
@@ -37,4 +31,26 @@ export interface MoveOption {
   attacker: Card;
   defender: Card;
   score: number;
+}
+
+export interface CombatOption2{
+  player: Player;
+  bot: Player;
+  attacker: Card;
+  defender: Card;
+  selectedAttacker: ISelectedCard | null;
+  selectedDefender: ISelectedCard | null;
+  playerCardViews: CardView[];
+  botCardViews: CardView[];
+  attackerView: CardView;
+  defenderView: CardView;
+  attackDamage: number;
+  counterDamage: number;
+}
+
+export interface CombatOption {
+  attacker: CardView;
+  defender: CardView;
+  attackDamage: number;
+  counterDamage: number;
 }

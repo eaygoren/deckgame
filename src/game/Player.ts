@@ -1,6 +1,5 @@
 import { Card, LeaderCard } from "./Card";
 import { Deck } from "./Deck";
-import type { Game } from "./Game";
 
 export class Player {
   public name: string;
@@ -25,11 +24,7 @@ export class Player {
     if (card) this.hand.push(card);
   }
 
-  public playTurn(game: Game, _opponent: Player) {
-    // Simple example: play the first card
-    const card = this.hand[0];
-    // Activate the card's ability if it exists
-    if (card.Ability) card.Ability.activate(card, this, game);
+  public playTurn() {
     // Remove the played card from hand
     this.hand.splice(0, 1);
   }

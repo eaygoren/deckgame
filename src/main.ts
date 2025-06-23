@@ -10,7 +10,7 @@ const app = new Application();
     width: 1920,
     height: 1080,
     resolution: window.devicePixelRatio || 1,
-    backgroundColor: 0xfafafa,
+    backgroundColor: 0x5c454d,
     resizeTo: window,
   });
 

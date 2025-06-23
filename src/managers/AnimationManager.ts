@@ -2,20 +2,23 @@ import { gsap } from 'gsap';
 import { Text } from 'pixi.js';
 import { CardView } from '../ui/CardView';
 import { BattleField } from '../ui/BattleField';
-import { CombatManager } from './CombatManager';
 import { AttackType } from '../shared/enums';
 import { Card, LeaderCard } from '../game/Card';
-import { ISelectedCard } from '../shared/interfaces';
-import { Player } from '../game/Player';
+import { CombatOption } from '../shared/interfaces';
+import { Broadcast } from '../utils/Broadcast';
+import { BroadcastEvents, CARD_POSITIONS } from '../shared/constants';
 
 export class AnimationManager {
     private static instance: AnimationManager;
+    private _broadcast: Broadcast;
     private _battlefield: BattleField;
-    private _combatManager: CombatManager;
+    private _activeAnimations: (gsap.core.Tween | gsap.core.Timeline)[] = []; // Active animasyonları takip et
 
     private constructor() {
+        this._broadcast = Broadcast.getInstance();
         this._battlefield = BattleField.getInstance();
-        this._combatManager = CombatManager.getInstance();
+
+        this.eventListeners();
     }
 
     public static getInstance(): AnimationManager {
@@ -25,10 +28,34 @@ export class AnimationManager {
         return AnimationManager.instance;
     }
 
-    private showDamageAnimation(targetView: CardView, damage: number, onComplete: () => void) {
+    // Tüm aktif animasyonları durdur
+    public stopAllAnimations() {
+        //console.log("Stopping all GSAP animations to prevent null reference errors");
+        this._activeAnimations.forEach(animation => {
+            if (animation && animation.isActive()) {
+                animation.kill();
+            }
+        });
+        this._activeAnimations = [];
+        gsap.killTweensOf("*"); // Tüm GSAP animasyonlarını durdur
+    }
+
+    // Animasyon tracker helper metodu
+    private trackAnimation(animation: gsap.core.Tween | gsap.core.Timeline): gsap.core.Tween | gsap.core.Timeline {
+        this._activeAnimations.push(animation);
+        return animation;
+    }
+
+    private eventListeners() {
+        this._broadcast.on(BroadcastEvents.SHOW_ABILITY_MESSAGE, this.showAbilityMessage.bind(this));
+        this._broadcast.on(BroadcastEvents.SHOW_DAMAGE_ANIMATION, this.showDamageAnimation.bind(this));
+    }
+
+    public async showDamageAnimation(data: { targetView: CardView, damage: number }): Promise<void> {
+        const { targetView, damage } = data;
+
         // Null check ekle
         if (!targetView || targetView.destroyed || !targetView.parent) {
-            onComplete();
             return;
         }
 
@@ -50,16 +77,28 @@ export class AnimationManager {
         this._battlefield.addChild(damageText);
 
         // Hasar animasyonu: Yukarı çık ve fade out
-        gsap.timeline()
-            .to(damageText, { y: damageText.y - 50, duration: 0.5 })
-            .to(damageText, { alpha: 0, duration: 0.5 }, "-=0.5")
-            .call(() => {
-                this._battlefield.removeChild(damageText);
-                onComplete();
-            });
+        return new Promise<void>((resolve) => {
+            const timeline = gsap.timeline();
+            this.trackAnimation(timeline);
+
+            timeline
+                .to(damageText, { y: damageText.y - 50, duration: 0.5 })
+                .to(damageText, { alpha: 0, duration: 0.5 }, "-=0.5")
+                .call(() => {
+                    if (damageText && damageText.parent) {
+                        this._battlefield.removeChild(damageText);
+                    }
+                    if (targetView && !targetView.destroyed) {
+                        targetView.update();
+                    }
+                    resolve();
+                });
+        });
     }
 
-    public showAbilityMessage(x: number, y: number, message: string, color: number = 0xffffff) {
+    public showAbilityMessage(data: { x: number, y: number, message: string, color: number }) {
+        const { x, y, message, color } = data;
+        
         const abilityText = new Text({
             text: message,
             style: {
@@ -85,242 +124,212 @@ export class AnimationManager {
             });
     }
 
-    public resolveAttackWithAnimation(selectedAttacker: ISelectedCard | null, selectedDefender: ISelectedCard | null) {
-        if (!selectedAttacker || !selectedDefender) return;
+    public resolvePlayerAttackWithAnimation(data: CombatOption) {
+        const { attacker, defender, attackDamage, counterDamage } = data;
 
-        const attackerView = selectedAttacker.view;
-        const defenderView = selectedDefender.view;
-        const attacker = attackerView.card;
-        const defender = defenderView.card;
-
-        // Calculate damage
-        const attackDamage = this._combatManager.calculateAttackDamage(attacker, defender);
-        const counterDamage = this._combatManager.calculateCounterDamage(attacker, defender);
+        if (!attacker || !defender) return;
 
         // 1. Saldırı animasyonu: Saldırgan hedefe doğru hareket eder
-        const originalX = attackerView.x;
-        const originalY = attackerView.y;
-        const targetX = defenderView.x;
-        const targetY = defenderView.y;
+        const originalX = attacker.x;
+        const originalY = attacker.y;
+        const targetX = defender.x;
+        const targetY = defender.y;
+
+        // Null check için animasyon öncesi kontrol
+        if (attacker.destroyed || defender.destroyed || !attacker.parent || !defender.parent) {
+            this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+            return;
+        }
 
         // Saldırganı hedefe doğru hareket ettir
-        gsap.to(attackerView, {
+        const attackTween = gsap.to(attacker, {
             x: targetX,
             y: targetY,
             duration: 0.3,
             ease: "power2.out",
             onComplete: () => {
                 // 2. Saldırgan hedefe ulaştığında hasar animasyonu göster
-                this.showDamageAnimation(defenderView, attackDamage, () => {
+                this.showDamageAnimation({ targetView: defender, damage: attackDamage }).then(() => {
+                    // Animasyon sırasında obje silinmiş olabilir
+                    if (!attacker || attacker.destroyed || !attacker.parent) {
+                        this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+                        return;
+                    }
+
                     // 3. Saldırganı geri gönder
-                    gsap.to(attackerView, {
+                    const returnTween = gsap.to(attacker, {
                         x: originalX,
                         y: originalY,
                         duration: 0.3,
                         ease: "power2.out",
                         onComplete: () => {
                             // 4. Counter damage (sadece melee için)
-                            if (attacker.AttackType === AttackType.Melee && counterDamage > 0) {
-                                this.showDamageAnimation(attackerView, counterDamage, () => {
-                                    this._combatManager.completeCombat(attacker, defender, selectedAttacker, selectedDefender, attackDamage, counterDamage);
+                            if (attacker.card.AttackType === AttackType.Melee && counterDamage > 0) {
+                                this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
+                                    this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
                                 });
                             } else {
-                                this._combatManager.completeCombat(attacker, defender, selectedAttacker, selectedDefender, attackDamage, counterDamage);
+                                this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
                             }
                         }
                     });
+
+                    this.trackAnimation(returnTween);
                 });
             }
         });
+
+        this.trackAnimation(attackTween);
     }
 
-    public resolveBotAttackWithAnimation(bestMove: { attacker: Card; defender: Card }, attackerView: CardView, defenderView: CardView) {
-        const attacker = bestMove.attacker;
-        const defender = bestMove.defender;
+    public resolveBotAttackWithAnimation(data: CombatOption) {
+        const { attacker, defender, attackDamage, counterDamage } = data;
 
-        // Calculate damage
-        const attackDamage = this._combatManager.calculateAttackDamage(attacker, defender);
-        const counterDamage = this._combatManager.calculateCounterDamage(attacker, defender);
+        if (!attacker || !defender) return;
 
         // Bot saldırı animasyonu
-        const originalX = attackerView.x;
-        const originalY = attackerView.y;
-        const targetX = defenderView.x;
-        const targetY = defenderView.y;
+        const originalX = attacker.x;
+        const originalY = attacker.y;
+        const targetX = defender.x;
+        const targetY = defender.y;
 
-        gsap.to(attackerView, {
+        // Null check için animasyon öncesi kontrol
+        if (attacker.destroyed || defender.destroyed || !attacker.parent || !defender.parent) {
+            this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+            return;
+        }
+
+        const attackTween = gsap.to(attacker, {
             x: targetX,
             y: targetY,
             duration: 0.3,
             ease: "power2.out",
             onComplete: () => {
-                this.showDamageAnimation(defenderView, attackDamage, () => {
-                    gsap.to(attackerView, {
+                this.showDamageAnimation({ targetView: defender, damage: attackDamage }).then(() => {
+                    // Animasyon sırasında obje silinmiş olabilir
+                    if (!attacker || attacker.destroyed || !attacker.parent) {
+                        this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+                        return;
+                    }
+
+                    const returnTween = gsap.to(attacker, {
                         x: originalX,
                         y: originalY,
                         duration: 0.3,
                         ease: "power2.out",
                         onComplete: () => {
-                            if (attacker.AttackType === AttackType.Melee && counterDamage > 0) {
-                                this.showDamageAnimation(attackerView, counterDamage, () => {
-                                    this._combatManager.completeBotCombat(attacker, defender, attackDamage, counterDamage, attackerView, defenderView);
+                            if (attacker.card.AttackType === AttackType.Melee && counterDamage > 0) {
+                                this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
+                                    this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
                                 });
                             } else {
-                                this._combatManager.completeBotCombat(attacker, defender, attackDamage, counterDamage, attackerView, defenderView);
+                                this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
                             }
                         }
                     });
+                    this.trackAnimation(returnTween);
                 });
             }
         });
+
+        this.trackAnimation(attackTween);
     }
 
-    public removeDeadCardsWithAnimation(player: Player, bot: Player, playerCardViews: CardView[], botCardViews: CardView[]) {
-        const prevPlayerHand = [...player.hand];
-        const prevBotHand = [...bot.hand];
+    public removeDeadCardsWithAnimation(playerCardViews: CardView[], botCardViews: CardView[]) {
+        // Ölü kartları tespit et
+        const playerDeadViews = playerCardViews.filter(view => view.card.Health <= 0);
+        const botDeadViews = botCardViews.filter(view => view.card.Health <= 0);
 
-        // Ölü kartları bul
-        player.hand = player.hand.filter(c => Math.max(0, c.Health) > 0);
-        bot.hand = bot.hand.filter(c => Math.max(0, c.Health) > 0);
+        // Hayatta kalan kartları tespit et
+        const playerAliveViews = playerCardViews.filter(view => view.card.Health > 0);
+        const botAliveViews = botCardViews.filter(view => view.card.Health > 0);
+
+        //console.log("Player dead cards:", playerDeadViews.map(v => v.card.Name));
+        //console.log("Bot dead cards:", botDeadViews.map(v => v.card.Name));
 
         // Hayatta kalan kartların view'larını güncelle
-        playerCardViews.forEach(view => {
-            if (player.hand.includes(view.card)) {
-                view.update();
-            }
-        });
-        botCardViews.forEach(view => {
-            if (bot.hand.includes(view.card)) {
-                view.update();
-            }
-        });
+        playerAliveViews.forEach(view => view.update());
+        botAliveViews.forEach(view => view.update());
 
-        const playerDeadIndexes = prevPlayerHand.map((c, i) => player.hand.includes(c) ? -1 : i).filter(i => i !== -1);
-        const botDeadIndexes = prevBotHand.map((c, i) => bot.hand.includes(c) ? -1 : i).filter(i => i !== -1);
         // Animasyonla ölü kartları kaldır
         const deadAnimations: Promise<void>[] = [];
+        // Player dead cards animation
+        playerDeadViews.forEach(view => {
+            const promise = new Promise<void>((resolve) => {
+                // View'ın hala geçerli olduğunu kontrol et
+                if (!view || view.destroyed) {
+                    resolve();
+                    return;
+                }
 
-        // Player dead cards
-        const playerDeadViews: CardView[] = [];
-        playerCardViews.forEach(view => {
-            if (!player.hand.includes(view.card)) {
-                playerDeadViews.push(view);
-                const promise = new Promise<void>((resolve) => {
-                    gsap.to(view, {
-                        alpha: 0,
-                        duration: 0.5,
-                        onComplete: () => {
+                const deathTween = gsap.to(view, {
+                    alpha: 0,
+                    duration: 0.5,
+                    onComplete: () => {
+                        //console.log(`Destroying dead player card: ${view.card.Name}`);
+                        if (view && !view.destroyed) {
                             view.destroy({ children: true });
-                            resolve();
                         }
-                    });
+                        resolve();
+                    }
                 });
-                deadAnimations.push(promise);
-            }
+                this.trackAnimation(deathTween);
+            });
+            deadAnimations.push(promise);
         });
 
-        // Bot dead cards
-        const botDeadViews: CardView[] = [];
-        botCardViews.forEach(view => {
-            if (!bot.hand.includes(view.card)) {
-                botDeadViews.push(view);
-                const promise = new Promise<void>((resolve) => {
-                    gsap.to(view, {
-                        alpha: 0,
-                        duration: 0.5,
-                        onComplete: () => {
+        // Bot dead cards animation
+        botDeadViews.forEach(view => {
+            const promise = new Promise<void>((resolve) => {
+                // View'ın hala geçerli olduğunu kontrol et
+                if (!view || view.destroyed) {
+                    resolve();
+                    return;
+                }
+
+                const deathTween = gsap.to(view, {
+                    alpha: 0,
+                    duration: 0.5,
+                    onComplete: () => {
+                        //console.log(`Destroying dead bot card: ${view.card.Name}`);
+                        if (view && !view.destroyed) {
                             view.destroy({ children: true });
-                            resolve();
                         }
-                    });
+                        resolve();
+                    }
                 });
-                deadAnimations.push(promise);
-            }
+                this.trackAnimation(deathTween);
+            });
+            deadAnimations.push(promise);
         });
 
-        // Ölü view'ları array'lerden kaldır
-        playerCardViews = playerCardViews.filter(view => !playerDeadViews.includes(view));
-        botCardViews = botCardViews.filter(view => !botDeadViews.includes(view));
-
-        // Tüm ölüm animasyonları bitince yeni kartları ekle
+        // Tüm ölüm animasyonları bitince hayatta kalan kartları güncelle
         Promise.all(deadAnimations).then(() => {
-            this.addNewCardsWithAnimation(playerCardViews, botCardViews, playerDeadIndexes, botDeadIndexes, player, bot);
+            this._broadcast.emit(BroadcastEvents.CARDS_REMOVED, {
+                playerAliveViews,
+                botAliveViews,
+                playerDeadViews,
+                botDeadViews
+            });
         });
     }
 
-    private addNewCardsWithAnimation(playerCardViews: CardView[], botCardViews: CardView[], playerDeadIndexes: number[], botDeadIndexes: number[], player: Player, bot: Player) {
-        // Store new cards separately to animate only them
-        const newPlayerCards: Card[] = [];
-        const newBotCards: Card[] = [];
-
-        // Yeni kart çek ve ekle
-        playerDeadIndexes.forEach(idx => {
-            if (player.hand.length < 5) {
-                const newCard = player.deck.drawRandomCard();
-                if (newCard) {
-                    player.hand.splice(idx, 0, newCard);
-                    newPlayerCards.push(newCard);
-                }
-            }
-        });
-
-        botDeadIndexes.forEach(idx => {
-            if (bot.hand.length < 5) {
-                const newCard = bot.deck.drawRandomCard();
-                if (newCard) {
-                    bot.hand.splice(idx, 0, newCard);
-                    newBotCards.push(newCard);
-                }
-            }
-        });
-
-        // Kazananı kontrol et
-        if (!player.hand.some(c => c instanceof LeaderCard)) {
-            this._turn = "player";
-            const restart = confirm("Bot Kazandı! Yeni oyun başlatmak ister misiniz?");
-            if (restart) {
-                this.restartGame();
-            }
-            return;
-        }
-        if (!bot.hand.some(c => c instanceof LeaderCard)) {
-            this._turn = "player";
-            const restart = confirm("Oyuncu Kazandı! Yeni oyun başlatmak ister misiniz?");
-            if (restart) {
-                this.restartGame();
-            }
-            return;
-        }
-
-        // Optimize the rendering - only animate new cards, keep existing ones in place
-        this.renderHandsWithOptimizedAnimation(playerCardViews, botCardViews, newPlayerCards, newBotCards, player, bot);
-    }
-
-    private renderHandsWithOptimizedAnimation(playerCardViews: CardView[], botCardViews: CardView[], newPlayerCards: Card[], newBotCards: Card[], player: Player, bot: Player) {
+    public renderHandsWithOptimizedAnimation(newPlayerCards: CardView[], newBotCards: CardView[]) {
         // Update existing card views to their new positions
-        this.repositionExistingCards(playerCardViews, botCardViews, player, bot);
+        this.repositionExistingCards(newPlayerCards, newBotCards);
 
         // Add only the new cards with animation
-        this.addNewCardViewsWithAnimation(newPlayerCards, newBotCards, player, bot, playerCardViews, botCardViews);
+        this.addNewCardViewsWithAnimation(newPlayerCards, newBotCards);
 
-        // Deck sayılarını güncelle
-        const playerDeckCount = player.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
-        const botDeckCount = bot.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
-        this._battlefield.showDeckCounts(playerDeckCount, botDeckCount);
+        // RESET_INTERACTION event'ini emit et
+        this._broadcast.emit(BroadcastEvents.RESET_INTERACTION);
+    }
 
-        // Interaction'ı yeniden kur
-        this.resetInteraction();
-        this.setupInteraction();
-    } 
-    
-    private repositionExistingCards(playerCardViews: CardView[], botCardViews: CardView[], player: Player, bot: Player) {
-        // Filter out dead card views first
-        playerCardViews = playerCardViews.filter(view => player.hand.includes(view.card));
-        botCardViews = botCardViews.filter(view => bot.hand.includes(view.card));
-
+    private repositionExistingCards(newPlayerCardViews: CardView[], newBotCardViews: CardView[]) {
         // Player cards repositioning
-        const playerHand = [...player.hand];
+        const playerHand = newPlayerCardViews.map(view => view.card);
         const playerLeaderIdx = playerHand.findIndex(c => c instanceof LeaderCard);
+
         let playerOrder: Card[] = [];
 
         if (playerLeaderIdx !== -1) {
@@ -339,7 +348,7 @@ export class AnimationManager {
 
         const playerStartX = 850 - (playerOrder.length - 1) * 150;
         playerOrder.forEach((card, i) => {
-            const existingView = playerCardViews.find(view => view.card === card);
+            const existingView = newPlayerCardViews.find(view => view.card === card);
             if (existingView) {
                 const finalX = playerStartX + i * 350;
                 // Update the view stats before repositioning
@@ -353,7 +362,7 @@ export class AnimationManager {
         });
 
         // Bot cards repositioning
-        const botHand = [...bot.hand];
+        const botHand = newBotCardViews.map(view => view.card);
         const botLeaderIdx = botHand.findIndex(c => c instanceof LeaderCard);
         let botOrder: Card[] = [];
 
@@ -373,7 +382,7 @@ export class AnimationManager {
 
         const botStartX = 850 - (botOrder.length - 1) * 150;
         botOrder.forEach((card, i) => {
-            const existingView = botCardViews.find(view => view.card === card);
+            const existingView = newBotCardViews.find(view => view.card === card);
             if (existingView) {
                 const finalX = botStartX + i * 350;
                 // Update the view stats before repositioning
@@ -385,14 +394,13 @@ export class AnimationManager {
                 });
             }
         });
-      }
+    }
 
-    private addNewCardViewsWithAnimation(newPlayerCards: Card[], newBotCards: Card[], player: Player, bot: Player, playerCardViews: CardView[], botCardViews: CardView[]) {
+    private addNewCardViewsWithAnimation(newPlayerCards: CardView[], newBotCards: CardView[]) {
         // Add new player cards with animation
-        newPlayerCards.forEach(card => {
-            const cardView = new CardView(card);
-            const playerOrder = this.getCardOrder(player.hand);
-            const cardIndex = playerOrder.indexOf(card);
+        newPlayerCards.forEach(cardView => {
+            const playerOrder = this.getCardOrder(newPlayerCards.map(c => c.card));
+            const cardIndex = playerOrder.indexOf(cardView.card);
             const playerStartX = 850 - (playerOrder.length - 1) * 150;
             const finalX = playerStartX + cardIndex * 350;
             const finalY = 750;
@@ -403,7 +411,7 @@ export class AnimationManager {
             cardView.alpha = 0;
 
             this._battlefield.addChild(cardView);
-            playerCardViews.push(cardView);
+            newPlayerCards.push(cardView);
 
             // Animate to final position
             gsap.to(cardView, {
@@ -415,10 +423,9 @@ export class AnimationManager {
         });
 
         // Add new bot cards with animation
-        newBotCards.forEach(card => {
-            const cardView = new CardView(card);
-            const botOrder = this.getCardOrder(bot.hand);
-            const cardIndex = botOrder.indexOf(card);
+        newBotCards.forEach(cardView => {
+            const botOrder = this.getCardOrder(newBotCards.map(c => c.card));
+            const cardIndex = botOrder.indexOf(cardView.card);
             const botStartX = 850 - (botOrder.length - 1) * 150;
             const finalX = botStartX + cardIndex * 350;
             const finalY = 200;
@@ -429,7 +436,7 @@ export class AnimationManager {
             cardView.alpha = 0;
 
             this._battlefield.addChild(cardView);
-            botCardViews.push(cardView);
+            newBotCards.push(cardView);
 
             // Animate to final position
             gsap.to(cardView, {
@@ -438,6 +445,156 @@ export class AnimationManager {
                 duration: 0.5,
                 ease: "power2.out"
             });
+        });
+    }
+
+    private getCardOrder(hand: Card[]): Card[] {
+        const leaderIdx = hand.findIndex(c => c instanceof LeaderCard);
+        let order: Card[] = [];
+
+        if (leaderIdx !== -1) {
+            const leader = hand[leaderIdx];
+            const otherCards = hand.filter(c => !(c instanceof LeaderCard));
+
+            if (otherCards.length >= 4) {
+                order = [otherCards[0], otherCards[1], leader, otherCards[2], otherCards[3]];
+            } else {
+                const midIndex = Math.floor(hand.length / 2);
+                order = [...otherCards.slice(0, midIndex), leader, ...otherCards.slice(midIndex)];
+            }
+        } else {
+            order = hand;
+        }
+
+        return order;
+    }
+
+    public addNewCardsWithSmartPositioning(newPlayerCards: CardView[], newBotCards: CardView[], allPlayerCards: CardView[], allBotCards: CardView[]) {
+        // Player kartları için fixed positioning
+        if (newPlayerCards.length > 0) {
+            this.addNewPlayerCardsWithFixedPositioning(newPlayerCards, allPlayerCards);
+        }
+
+        // Bot kartları için fixed positioning
+        if (newBotCards.length > 0) {
+            this.addNewBotCardsWithFixedPositioning(newBotCards, allBotCards);
+        }
+
+        // RESET_INTERACTION event'ini emit et
+        this._broadcast.emit(BroadcastEvents.RESET_INTERACTION);
+    }
+
+    private addNewPlayerCardsWithFixedPositioning(newCards: CardView[], allCards: CardView[]) {
+        // Mevcut kartların hangi slot'larda olduğunu tespit et
+        const occupiedSlots = new Set<number>();
+        //console.log("=== Player Card Slot Detection ===");
+        allCards.forEach(cardView => {
+            if (!newCards.includes(cardView)) {
+                // Mevcut kartın hangi slot'ta olduğunu bul (75 piksel tolerans)
+                const currentSlot = CARD_POSITIONS.findIndex(pos => Math.abs(cardView.x - pos.x) < 75);
+                //console.log(`Card ${cardView.card.Name} at x:${cardView.x} -> slot:${currentSlot}`);
+                if (currentSlot !== -1) {
+                    occupiedSlots.add(currentSlot);
+                }
+            }
+        });
+        //console.log("Occupied slots:", Array.from(occupiedSlots));
+
+        // Yeni kartları boş slot'lara yerleştir
+        newCards.forEach(newCard => {
+            const isLeader = newCard.card instanceof LeaderCard;
+            let targetSlot = -1;
+
+            if (isLeader) {
+                targetSlot = 2; // Leader her zaman slot 2'ye (orta)
+                occupiedSlots.add(2);
+            } else {
+                // Leader değilse boş slot bul
+                for (let i = 0; i < CARD_POSITIONS.length; i++) {
+                    if (!occupiedSlots.has(i)) {
+                        targetSlot = i;
+                        occupiedSlots.add(i);
+                        break;
+                    }
+                }
+            }
+
+            //console.log(`New card ${newCard.card.Name} (Leader: ${isLeader}) -> target slot: ${targetSlot}`);
+
+            if (targetSlot !== -1) {
+                const targetPos = CARD_POSITIONS[targetSlot];
+
+                // Yeni kart animasyonla gelir
+                newCard.x = targetPos.x + 400; // Sağdan başla
+                newCard.y = 750;
+                newCard.alpha = 0;
+                this._battlefield.addChild(newCard);
+
+                const newCardTween = gsap.to(newCard, {
+                    x: targetPos.x,
+                    alpha: 1,
+                    duration: 0.6,
+                    ease: "power2.out"
+                });
+                this.trackAnimation(newCardTween);
+            }
+        });
+    }
+
+    private addNewBotCardsWithFixedPositioning(newCards: CardView[], allCards: CardView[]) {
+        // Mevcut kartların hangi slot'larda olduğunu tespit et
+        const occupiedSlots = new Set<number>();
+        //console.log("=== Bot Card Slot Detection ===");
+        allCards.forEach(cardView => {
+            if (!newCards.includes(cardView)) {
+                // Mevcut kartın hangi slot'ta olduğunu bul (75 piksel tolerans)
+                const currentSlot = CARD_POSITIONS.findIndex(pos => Math.abs(cardView.x - pos.x) < 75);
+                //console.log(`Bot Card ${cardView.card.Name} at x:${cardView.x} -> slot:${currentSlot}`);
+                if (currentSlot !== -1) {
+                    occupiedSlots.add(currentSlot);
+                }
+            }
+        });
+        //console.log("Bot Occupied slots:", Array.from(occupiedSlots));
+
+        // Yeni kartları boş slot'lara yerleştir
+        newCards.forEach(newCard => {
+            const isLeader = newCard.card instanceof LeaderCard;
+            let targetSlot = -1;
+
+            if (isLeader) {
+                targetSlot = 2; // Leader her zaman slot 2'ye (orta)
+                occupiedSlots.add(2);
+            } else {
+                // Leader değilse boş slot bul
+                for (let i = 0; i < CARD_POSITIONS.length; i++) {
+                    if (!occupiedSlots.has(i)) {
+                        targetSlot = i;
+                        occupiedSlots.add(i);
+                        break;
+                    }
+                }
+            }
+
+            //console.log(`New bot card ${newCard.card.Name} -> target slot: ${targetSlot}`);
+
+            if (targetSlot !== -1) {
+                const targetPos = CARD_POSITIONS[targetSlot];
+
+                // Yeni kart animasyonla gelir
+                newCard.x = targetPos.x + 400; // Sağdan başla
+                newCard.y = 200;
+                newCard.alpha = 0;
+                this._battlefield.addChild(newCard);
+
+                const newCardTween = gsap.to(newCard, {
+                    x: targetPos.x,
+                    alpha: 1,
+                    duration: 0.6,
+                    ease: "power2.out"
+                });
+                this.trackAnimation(newCardTween);
+            }
         });
     }
 }
