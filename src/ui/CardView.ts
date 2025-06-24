@@ -5,7 +5,7 @@ import { ClassType } from "../shared/enums";
 
 export class CardView extends Container {
   private _card: Card;
-  private _cardContainer: Container; // Container for the card
+  private _cardContainer!: Container; // Container for the card
   private _statText: Text | undefined; // Stat text reference
 
   constructor(card: Card) {
@@ -13,10 +13,6 @@ export class CardView extends Container {
     this._card = card;
     this.label = card.Name;
     this.interactive = true;
-
-    // Create a container for the card
-    this._cardContainer = new Container();
-    this.addChild(this._cardContainer);
 
     this.drawCard();
   }
@@ -26,6 +22,26 @@ export class CardView extends Container {
   }
 
   private drawCard() {
+    const skillTextArea = new Graphics();
+    skillTextArea.beginPath();
+    skillTextArea.roundRect(-90, 230, 180, 45, 10);
+    skillTextArea.stroke({ color: 0x000000, width: 3 });
+    skillTextArea.fill({ color: 0x000000, alpha: 0.5 });
+    skillTextArea.closePath();
+    skillTextArea.label = "SkillTextArea";
+    this.addChild(skillTextArea);
+
+    let skillText = "No Skill";
+    const skillTextDisplay = new Text({ text: skillText, style: { fontSize: 20, fill: 0xfafafa } });
+    skillTextDisplay.anchor.set(0.5);
+    skillTextDisplay.position.set(0, 260);
+    skillTextDisplay.label = "Skill";
+    skillTextArea.addChild(skillTextDisplay);
+
+    // Create a container for the card
+    this._cardContainer = new Container({label: "CardContainer"});
+    this.addChild(this._cardContainer);
+
     const mask = new Graphics();
     mask.beginPath();
     mask.roundRect(-125, -125, 250, 370, 20);
@@ -33,6 +49,7 @@ export class CardView extends Container {
     mask.closePath();
     mask.label = "Mask";
     this._cardContainer.addChild(mask);
+    this._cardContainer.mask = mask;
 
     const sprite = Sprite.from(this._card.Cover);
     sprite.anchor.set(0.5, 1);
@@ -58,7 +75,6 @@ export class CardView extends Container {
     seperator.closePath();
     seperator.label = "Seperator";
     this._cardContainer.addChild(seperator);
-    this._cardContainer.mask = mask;
 
     let attackTypeIcon: string = "";
     switch (this._card.AttackType) {
@@ -76,7 +92,7 @@ export class CardView extends Container {
       attackTypeSprite.scale.set(1);
       attackTypeSprite.position.set(-90, 207);
       attackTypeSprite.label = "AttackTypeIcon";
-      this.addChild(attackTypeSprite);
+      this._cardContainer.addChild(attackTypeSprite);
     }
 
     let classTypeIcon: string = "";
@@ -101,14 +117,14 @@ export class CardView extends Container {
       classTypeSprite.scale.set(1);
       classTypeSprite.position.set(90, 207);
       classTypeSprite.label = "ClassTypeIcon";
-      this.addChild(classTypeSprite);
+      this._cardContainer.addChild(classTypeSprite);
     }
 
     const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: 0xfafafa } });
     nameText.anchor.set(0.5);
     nameText.position.set(0, 190);
     nameText.label = "Name";
-    this.addChild(nameText);
+    this._cardContainer.addChild(nameText);
 
     if (this._card instanceof LeaderCard) {
       const crown = Sprite.from(this._card.Crown);
@@ -141,6 +157,6 @@ export class CardView extends Container {
     this._statText.anchor.set(0.5);
     this._statText.position.set(0, 220);
     this._statText.label = "Stats";
-    this.addChild(this._statText);
+    this._cardContainer.addChild(this._statText);
   }
 }
