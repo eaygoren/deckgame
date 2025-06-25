@@ -4,34 +4,43 @@ import { IAbility } from "./interfaces";
 
 export const Characters = {
     Aerwyn: "Aerwyn",
+    Alien: "Alien",
+    Arcangel: "Arcangel",
+    Arcmage: "Arcmage",
     Assassin: "Assassin",
     Cerberus: "Cerberus",
+    Cyclop: "Cyclop",
     Dragon: "Dragon",
+    // Dwarf: "Dwarf",
     Elf: "Elf",
     Ent: "Ent",
-    Ixelis: "Ixelis",
+    Gunslinger: "Gunslinger",
+    Illusionist: "Illusionist",
+    Joker: "Joker",
     Knight: "Knight",
-    Arcmage: "Arcmage",
+    Lich: "Lich",
+    // Medusa: "Medusa",
+    // Minotaur: "Minotaur",
+    Monk: "Monk",
+    // Mummy: "Mummy",
+    // Naga: "Naga",
     Ra: "Ra",
+    // Phoenix: "Phoenix",
+    // Pirate: "Pirate",
+    Reaper: "Reaper",
+    // Robot: "Robot",
     Samurai: "Samurai",
     Siren: "Siren",
+    // Skeleton: "Skeleton",
     Vampire: "Vampire",
     Werewolf: "Werewolf",
+    // Witch: "Witch",
+    Wukong: "Wukong",
     Zeus: "Zeus",
-    Zombie: "Zombie",
+    Zombie: "Zombie"
 }
 
 export const CharacterList = {
-    Arcmage: {
-        name: Characters.Arcmage,
-        cover: Characters.Arcmage.toLowerCase(),
-        attack: 5,
-        health: 6,
-        rarity: Rarity.Rare,
-        color: Color.Rare,
-        attackType: AttackType.Ranged,
-        classType: ClassType.Mage
-    },
     Aerwyn: {
         name: Characters.Aerwyn,
         cover: Characters.Aerwyn.toLowerCase(),
@@ -41,6 +50,36 @@ export const CharacterList = {
         color: Color.Legendary,
         attackType: AttackType.Ranged,
         classType: ClassType.Rogue
+    },
+    Alien: {
+        name: Characters.Alien,
+        cover: Characters.Alien.toLowerCase(),
+        attack: 4,
+        health: 5,
+        rarity: Rarity.Common,
+        color: Color.Common,
+        attackType: AttackType.Melee,
+        classType: ClassType.Rogue
+    },
+    Arcangel: {
+        name: Characters.Arcangel,
+        cover: Characters.Arcangel.toLowerCase(),
+        attack: 9,
+        health: 7,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        attackType: AttackType.Melee,
+        classType: ClassType.Mage
+    },
+    Arcmage: {
+        name: Characters.Arcmage,
+        cover: Characters.Arcmage.toLowerCase(),
+        attack: 5,
+        health: 6,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
+        attackType: AttackType.Ranged,
+        classType: ClassType.Mage
     },
     Assassin: {
         name: Characters.Assassin,
@@ -61,6 +100,16 @@ export const CharacterList = {
         color: Color.Rare,
         attackType: AttackType.Melee,
         classType: ClassType.Mage
+    },
+    Cyclop: {
+        name: Characters.Cyclop,
+        cover: Characters.Cyclop.toLowerCase(),
+        attack: 5,
+        health: 6,
+        rarity: Rarity.Common,
+        color: Color.Common,
+        attackType: AttackType.Melee,
+        classType: ClassType.Tank
     },
     Dragon: {
         name: Characters.Dragon,
@@ -92,14 +141,34 @@ export const CharacterList = {
         attackType: AttackType.Melee,
         classType: ClassType.Tank
     },
-    Ixelis: {
-        name: Characters.Ixelis,
-        cover: Characters.Ixelis.toLowerCase(),
+    Gunslinger: {
+        name: Characters.Gunslinger,
+        cover: Characters.Gunslinger.toLowerCase(),
         attack: 8,
         health: 6,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
+        classType: ClassType.Rogue
+    },
+    Illusionist: {
+        name: Characters.Illusionist,
+        cover: Characters.Illusionist.toLowerCase(),
+        attack: 6,
+        health: 7,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
+        attackType: AttackType.Ranged,
+        classType: ClassType.Mage
+    },
+    Joker: {
+        name: Characters.Joker,
+        cover: Characters.Joker.toLowerCase(),
+        attack: 7,
+        health: 6,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
+        attackType: AttackType.Melee,
         classType: ClassType.Rogue
     },
     Knight: {
@@ -112,11 +181,41 @@ export const CharacterList = {
         attackType: AttackType.Melee,
         classType: ClassType.Tank
     },
+    Lich: {
+        name: Characters.Lich,
+        cover: Characters.Lich.toLowerCase(),
+        attack: 6,
+        health: 8,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        attackType: AttackType.Melee,
+        classType: ClassType.Tank
+    },
+    Monk: {
+        name: Characters.Monk,
+        cover: Characters.Monk.toLowerCase(),
+        attack: 5,
+        health: 10,
+        rarity: Rarity.Common,
+        color: Color.Common,
+        attackType: AttackType.Melee,
+        classType: ClassType.Warrior
+    },
     Ra: {
         name: Characters.Ra,
         cover: Characters.Ra.toLowerCase(),
         attack: 10,
         health: 5,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        attackType: AttackType.Melee,
+        classType: ClassType.Warrior
+    },
+    Reaper: {
+        name: Characters.Reaper,
+        cover: Characters.Reaper.toLowerCase(),
+        attack: 9,
+        health: 6,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
@@ -159,6 +258,16 @@ export const CharacterList = {
         health: 6,
         rarity: Rarity.Common,
         color: Color.Common,
+        attackType: AttackType.Melee,
+        classType: ClassType.Warrior
+    },
+    Wukong: {
+        name: Characters.Wukong,
+        cover: Characters.Wukong.toLowerCase(),
+        attack: 8,
+        health: 9,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Melee,
         classType: ClassType.Warrior
     },
