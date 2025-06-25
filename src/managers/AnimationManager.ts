@@ -74,7 +74,7 @@ export class AnimationManager {
         damageText.x = targetView.x;
         damageText.y = targetView.y - 50;
         damageText.anchor.set(0.5);
-        this._battlefield.addChild(damageText);
+        this._battlefield.battleLog.addChild(damageText);
 
         // Hasar animasyonu: Yukarı çık ve fade out
         return new Promise<void>((resolve) => {
@@ -86,7 +86,7 @@ export class AnimationManager {
                 .to(damageText, { alpha: 0, duration: 0.5 }, "-=0.5")
                 .call(() => {
                     if (damageText && damageText.parent) {
-                        this._battlefield.removeChild(damageText);
+                        this._battlefield.battleLog.removeChild(damageText);
                     }
                     if (targetView && !targetView.destroyed) {
                         targetView.update();
@@ -113,14 +113,14 @@ export class AnimationManager {
         abilityText.x = x;
         abilityText.y = y - 100;
         abilityText.anchor.set(0.5);
-        this._battlefield.addChild(abilityText);
+        this._battlefield.battleLog.addChild(abilityText);
 
         // Ability mesaj animasyonu
         gsap.timeline()
             .to(abilityText, { y: abilityText.y - 30, alpha: 0.8, duration: 0.3 })
             .to(abilityText, { alpha: 0, duration: 0.7 }, "-=0.3")
             .call(() => {
-                this._battlefield.removeChild(abilityText);
+                this._battlefield.battleLog.removeChild(abilityText);
             });
     }
 
@@ -164,7 +164,7 @@ export class AnimationManager {
                         ease: "power2.out",
                         onComplete: () => {
                             // 4. Counter damage (sadece melee için)
-                            if (attacker.card.AttackType === AttackType.Melee && counterDamage > 0) {
+                            if (attacker.card.attackType === AttackType.Melee && counterDamage > 0) {
                                 this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
                                     this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
                                 });
@@ -218,7 +218,7 @@ export class AnimationManager {
                         duration: 0.3,
                         ease: "power2.out",
                         onComplete: () => {
-                            if (attacker.card.AttackType === AttackType.Melee && counterDamage > 0) {
+                            if (attacker.card.attackType === AttackType.Melee && counterDamage > 0) {
                                 this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
                                     this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
                                 });
@@ -237,12 +237,12 @@ export class AnimationManager {
 
     public removeDeadCardsWithAnimation(playerCardViews: CardView[], botCardViews: CardView[]) {
         // Ölü kartları tespit et
-        const playerDeadViews = playerCardViews.filter(view => view.card.Health <= 0);
-        const botDeadViews = botCardViews.filter(view => view.card.Health <= 0);
+        const playerDeadViews = playerCardViews.filter(view => view.card.health <= 0);
+        const botDeadViews = botCardViews.filter(view => view.card.health <= 0);
 
         // Hayatta kalan kartları tespit et
-        const playerAliveViews = playerCardViews.filter(view => view.card.Health > 0);
-        const botAliveViews = botCardViews.filter(view => view.card.Health > 0);
+        const playerAliveViews = playerCardViews.filter(view => view.card.health > 0);
+        const botAliveViews = botCardViews.filter(view => view.card.health > 0);
 
         //console.log("Player dead cards:", playerDeadViews.map(v => v.card.Name));
         //console.log("Bot dead cards:", botDeadViews.map(v => v.card.Name));
@@ -410,7 +410,7 @@ export class AnimationManager {
             cardView.y = finalY;
             cardView.alpha = 0;
 
-            this._battlefield.addChild(cardView);
+            this._battlefield.addChildToPlayerField(cardView);
             newPlayerCards.push(cardView);
 
             // Animate to final position
@@ -435,7 +435,7 @@ export class AnimationManager {
             cardView.y = finalY;
             cardView.alpha = 0;
 
-            this._battlefield.addChild(cardView);
+            this._battlefield.addChildToBotField(cardView);
             newBotCards.push(cardView);
 
             // Animate to final position
@@ -528,7 +528,7 @@ export class AnimationManager {
                 newCard.x = targetPos.x + 400; // Sağdan başla
                 newCard.y = 750;
                 newCard.alpha = 0;
-                this._battlefield.addChild(newCard);
+                this._battlefield.addChildToPlayerField(newCard);
 
                 const newCardTween = gsap.to(newCard, {
                     x: targetPos.x,
@@ -585,7 +585,7 @@ export class AnimationManager {
                 newCard.x = targetPos.x + 400; // Sağdan başla
                 newCard.y = 200;
                 newCard.alpha = 0;
-                this._battlefield.addChild(newCard);
+                this._battlefield.addChildToBotField(newCard);
 
                 const newCardTween = gsap.to(newCard, {
                     x: targetPos.x,

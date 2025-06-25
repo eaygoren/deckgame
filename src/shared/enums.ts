@@ -2,10 +2,6 @@ export enum Turn {
     Player,
     Bot,
 }
-export enum Faction {
-    Forest = "Forest",
-    Empire = "Empire",
-}
 export enum Rarity {
     Common = "Common",
     Rare = "Rare",

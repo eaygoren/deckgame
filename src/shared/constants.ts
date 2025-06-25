@@ -1,8 +1,8 @@
-import { Card, Color, Faction, Rarity, AttackType } from "../game/Card";
+import { Color, Rarity, AttackType } from "../game/Card";
 import { ClassType } from "./enums";
 import { IAbility } from "./interfaces";
 
-export const CharacterNames = {
+export const Characters = {
     Aerwyn: "Aerwyn",
     Assassin: "Assassin",
     Cerberus: "Cerberus",
@@ -21,197 +21,162 @@ export const CharacterNames = {
     Zombie: "Zombie",
 }
 
-export const CharacterSource = {
-    Aerwyn: "aerwyn",
-    Assassin: "assassin",
-    Cerberus: "cerberus",
-    Dragon: "dragon",
-    Elf: "elf",
-    Ent: "ent",
-    Ixelis: "ixelis",
-    Knight: "knight",
-    Arcmage: "arcmage",
-    Ra: "ra",
-    Siren: "siren",
-    Samurai: "samurai",
-    Vampire: "vampire",
-    Werewolf: "werewolf",
-    Zeus: "zeus",
-    Zombie: "zombie",
-}
-
 export const CharacterList = {
     Arcmage: {
-        name: CharacterNames.Arcmage,
-        cover: CharacterSource.Arcmage,
-        attack: 5, // Reduced from 7 (ranged penalty)
-        health: 6, // Reduced from 8 (ranged penalty)
-        faction: Faction.Forest,
+        name: Characters.Arcmage,
+        cover: Characters.Arcmage.toLowerCase(),
+        attack: 5,
+        health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
         classType: ClassType.Mage
     },
     Aerwyn: {
-        name: CharacterNames.Aerwyn,
-        cover: CharacterSource.Aerwyn,
+        name: Characters.Aerwyn,
+        cover: Characters.Aerwyn.toLowerCase(),
         attack: 6,
         health: 8,
-        faction: Faction.Forest,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
         classType: ClassType.Rogue
     },
     Assassin: {
-        name: CharacterNames.Assassin,
-        cover: CharacterSource.Assassin,
+        name: Characters.Assassin,
+        cover: Characters.Assassin.toLowerCase(),
         attack: 8,
         health: 5,
-        faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Rogue
     },
     Cerberus: {
-        name: CharacterNames.Cerberus,
-        cover: CharacterSource.Cerberus,
+        name: Characters.Cerberus,
+        cover: Characters.Cerberus.toLowerCase(),
         attack: 6,
         health: 7,
-        faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
         classType: ClassType.Mage
     },
     Dragon: {
-        name: CharacterNames.Dragon,
-        cover: CharacterSource.Dragon,
-        attack: 7, // Reduced from 9 (ranged penalty)
-        health: 4, // Reduced from 6 (ranged penalty)
-        faction: Faction.Forest,
+        name: Characters.Dragon,
+        cover: Characters.Dragon.toLowerCase(),
+        attack: 7,
+        health: 4,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
         classType: ClassType.Mage
     },
     Elf: {
-        name: CharacterNames.Elf,
-        cover: CharacterSource.Elf,
-        attack: 3, // Reduced from 4 (ranged penalty)
-        health: 7, // Reduced from 9 (ranged penalty)
-        faction: Faction.Empire,
+        name: Characters.Elf,
+        cover: Characters.Elf.toLowerCase(),
+        attack: 3,
+        health: 7,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
         classType: ClassType.Rogue
     },
     Ent: {
-        name: CharacterNames.Ent,
-        cover: CharacterSource.Ent,
+        name: Characters.Ent,
+        cover: Characters.Ent.toLowerCase(),
         attack: 4,
         health: 10,
-        faction: Faction.Forest,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Tank
     },
     Ixelis: {
-        name: CharacterNames.Ixelis,
-        cover: CharacterSource.Ixelis,
+        name: Characters.Ixelis,
+        cover: Characters.Ixelis.toLowerCase(),
         attack: 8,
         health: 6,
-        faction: Faction.Forest,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
         classType: ClassType.Rogue
     },
     Knight: {
-        name: CharacterNames.Knight,
-        cover: CharacterSource.Knight,
+        name: Characters.Knight,
+        cover: Characters.Knight.toLowerCase(),
         attack: 5,
         health: 10,
-        faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Tank
     },
     Ra: {
-        name: CharacterNames.Ra,
-        cover: CharacterSource.Ra,
+        name: Characters.Ra,
+        cover: Characters.Ra.toLowerCase(),
         attack: 10,
         health: 5,
-        faction: Faction.Empire,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
         classType: ClassType.Warrior
     },
     Samurai: {
-        name: CharacterNames.Samurai,
-        cover: CharacterSource.Samurai,
+        name: Characters.Samurai,
+        cover: Characters.Samurai.toLowerCase(),
         attack: 8,
         health: 9,
-        faction: Faction.Empire,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
         classType: ClassType.Warrior
     },
     Siren: {
-        name: CharacterNames.Siren,
-        cover: CharacterSource.Siren,
-        attack: 4, // Reduced from 6 (ranged penalty)
-        health: 6, // Reduced from 8 (ranged penalty)
-        faction: Faction.Forest,
+        name: Characters.Siren,
+        cover: Characters.Siren.toLowerCase(),
+        attack: 4,
+        health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
         classType: ClassType.Mage
     },
     Vampire: {
-        name: CharacterNames.Vampire,
-        cover: CharacterSource.Vampire,
+        name: Characters.Vampire,
+        cover: Characters.Vampire.toLowerCase(),
         attack: 8,
         health: 7,
-        faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Tank
     },
     Werewolf: {
-        name: CharacterNames.Werewolf,
-        cover: CharacterSource.Werewolf,
+        name: Characters.Werewolf,
+        cover: Characters.Werewolf.toLowerCase(),
         attack: 7,
         health: 6,
-        faction: Faction.Empire,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Warrior
     },
     Zeus: {
-        name: CharacterNames.Zeus,
-        cover: CharacterSource.Zeus,
+        name: Characters.Zeus,
+        cover: Characters.Zeus.toLowerCase(),
         attack: 9,
         health: 8,
-        faction: Faction.Empire,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
         classType: ClassType.Mage
     },
     Zombie: {
-        name: CharacterNames.Zombie,
-        cover: CharacterSource.Zombie,
+        name: Characters.Zombie,
+        cover: Characters.Zombie.toLowerCase(),
         attack: 5,
         health: 9,
-        faction: Faction.Forest,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
@@ -237,19 +202,6 @@ export const TankAbility: IAbility = {
 export const WarriorAbility: IAbility = {
     name: "Berserker Rage",
     description: "Permanently gain 50% more attack when health drops below 50%."
-};
-
-// Helper function to get initial health from character data
-export const getInitialHealth = (card: Card): number => {
-    const characterData = Object.values(CharacterList).find(char =>
-        char.name === card.Name.replace(/^Leader /, "") // Remove "Leader " prefix if present
-    );
-    if (characterData) {
-        // If it's a leader card, add the leader bonus
-        return card.Name.includes("Leader") ? characterData.health + 5 : characterData.health;
-    }
-    // Fallback: assume current health is initial health
-    return card.Health;
 };
 
 export const ClassAbilities = {

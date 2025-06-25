@@ -1,9 +1,12 @@
-import { Container, Sprite, Text } from "pixi.js";
+import { Container, ContainerChild, IRenderLayer, Sprite, Text } from "pixi.js";
 
 export class BattleField extends Container {
     private static instance: BattleField;
-    private playerDeckText: Text | null = null;
-    private botDeckText: Text | null = null;
+    private _playerField!: Container;
+    private _botField!: Container;
+    private _battleLog!: Container;
+    private _playerDeckText: Text | null = null;
+    private _botDeckText: Text | null = null;
 
     private constructor() {
         super();
@@ -17,43 +20,84 @@ export class BattleField extends Container {
     }
 
     public showDeckCounts(playerCount: number, botCount: number) {
-        // Remove old texts if they exist
-        if (this.playerDeckText) this.removeChild(this.playerDeckText);
-        if (this.botDeckText) this.removeChild(this.botDeckText);
-
         // Player indicators
+        if (!this._playerField) {
+            this._playerField = new Container({ label: "PlayerField" });
+            this.addChild(this._playerField);
+        }
+        if (!this._botField) {
+            this._botField = new Container({ label: "BotField" });
+            this.addChild(this._botField);
+        }
+        if (!this._battleLog) {
+            this._battleLog = new Container({ label: "BattleLog" });
+            this.addChild(this._battleLog);
+        }
+
         let playerDeckIcon = Sprite.from("deck");
+        playerDeckIcon.label = "PlayerDeckIcon";
         playerDeckIcon.position.set(1845, 802);
         playerDeckIcon.scale.x = -1;
         playerDeckIcon.angle = 7;
         playerDeckIcon.anchor.set(0.5, 0.5);
-        this.addChild(playerDeckIcon);
+        this._playerField.addChild(playerDeckIcon);
 
-        this.playerDeckText = new Text({ text: playerCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
-        this.playerDeckText.position.set(1843, 800);
-        this.playerDeckText.anchor.set?.(0.5, 0.5);
-        this.addChild(this.playerDeckText);
+        this._playerDeckText = new Text({ text: playerCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
+        this._playerDeckText.label = "PlayerDeckText";
+        this._playerDeckText.position.set(1843, 800);
+        this._playerDeckText.anchor.set?.(0.5, 0.5);
+        this._playerField.addChild(this._playerDeckText);
 
         // Bot indicators
         let botDeckIcon = Sprite.from("deck");
+        botDeckIcon.label = "BotDeckIcon";
         botDeckIcon.position.set(1845, 250);
         botDeckIcon.scale.x = -1;
         botDeckIcon.angle = 7;
         botDeckIcon.anchor.set(0.5, 0.5);
-        this.addChild(botDeckIcon);
+        this._botField.addChild(botDeckIcon);
 
-        this.botDeckText = new Text({ text: botCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
-        this.botDeckText.position.set(1843, 250);
-        this.botDeckText.anchor.set?.(0.5, 0.5);
-        this.addChild(this.botDeckText);
+        this._botDeckText = new Text({ text: botCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
+        this._botDeckText.label = "BotDeckText";
+        this._botDeckText.position.set(1843, 250);
+        this._botDeckText.anchor.set?.(0.5, 0.5);
+        this._botField.addChild(this._botDeckText);
     }
 
     public updateDeckCounts(playerCount: number, botCount: number) {
-        if (this.playerDeckText) {
-            this.playerDeckText.text = playerCount.toString();
+        if (this._playerDeckText) {
+            this._playerDeckText.text = playerCount.toString();
         }
-        if (this.botDeckText) {
-            this.botDeckText.text = botCount.toString();
+        if (this._botDeckText) {
+            this._botDeckText.text = botCount.toString();
         }
+    }
+
+    public addChildToPlayerField<U extends (ContainerChild | IRenderLayer)[]>(...children: U): void {
+        if (!this._playerField) {
+            this._playerField = new Container({ label: "PlayerField" });
+            this.addChild(this._playerField);
+        }
+        this._playerField.addChild(...children);
+    }
+
+    public addChildToBotField<U extends (ContainerChild | IRenderLayer)[]>(...children: U): void {
+        if (!this._botField) {
+            this._botField = new Container({ label: "BotField" });
+            this.addChild(this._botField);
+        }
+        this._botField.addChild(...children);
+    }
+
+    public get playerField(): Container {
+        return this._playerField;
+    }
+
+    public get botField(): Container {
+        return this._botField;
+    }
+
+    public get battleLog(): Container {
+        return this._battleLog;
     }
 }

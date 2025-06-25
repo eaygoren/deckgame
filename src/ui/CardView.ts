@@ -11,7 +11,7 @@ export class CardView extends Container {
   constructor(card: Card) {
     super();
     this._card = card;
-    this.label = card.Name;
+    this.label = card.name;
     this.interactive = true;
 
     this.drawCard();
@@ -22,6 +22,10 @@ export class CardView extends Container {
   }
 
   private drawCard() {
+    let skillContainer = new Container();
+    skillContainer.label = "SkillContainer";
+    this.addChild(skillContainer);
+
     const skillTextArea = new Graphics();
     skillTextArea.beginPath();
     skillTextArea.roundRect(-90, 230, 180, 45, 10);
@@ -29,14 +33,14 @@ export class CardView extends Container {
     skillTextArea.fill({ color: 0x000000, alpha: 0.5 });
     skillTextArea.closePath();
     skillTextArea.label = "SkillTextArea";
-    this.addChild(skillTextArea);
+    skillContainer.addChild(skillTextArea);
 
     let skillText = "No Skill";
     const skillTextDisplay = new Text({ text: skillText, style: { fontSize: 20, fill: 0xfafafa } });
     skillTextDisplay.anchor.set(0.5);
     skillTextDisplay.position.set(0, 260);
     skillTextDisplay.label = "Skill";
-    skillTextArea.addChild(skillTextDisplay);
+    skillContainer.addChild(skillTextDisplay);
 
     // Create a container for the card
     this._cardContainer = new Container({label: "CardContainer"});
@@ -51,7 +55,7 @@ export class CardView extends Container {
     this._cardContainer.addChild(mask);
     this._cardContainer.mask = mask;
 
-    const sprite = Sprite.from(this._card.Cover);
+    const sprite = Sprite.from(this._card.cover);
     sprite.anchor.set(0.5, 1);
     sprite.scale.set(1);
     sprite.position.set(0, 245);
@@ -62,7 +66,7 @@ export class CardView extends Container {
     background.beginPath();
     background.roundRect(-125, -125, 250, 370, 20);
     background.stroke({ color: 0x000000, width: 6 });
-    background.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.Color, alpha: 0 });
+    background.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, alpha: 0 });
     background.closePath();
     background.label = "Background";
     this._cardContainer.addChild(background);
@@ -77,7 +81,7 @@ export class CardView extends Container {
     this._cardContainer.addChild(seperator);
 
     let attackTypeIcon: string = "";
-    switch (this._card.AttackType) {
+    switch (this._card.attackType) {
       case AttackType.Melee:
         attackTypeIcon = Environment.melee;
         break;
@@ -96,7 +100,7 @@ export class CardView extends Container {
     }
 
     let classTypeIcon: string = "";
-    switch (this._card.ClassType) {
+    switch (this._card.classType) {
       case ClassType.Tank:
         classTypeIcon = Environment.tank;
         break;
@@ -120,14 +124,14 @@ export class CardView extends Container {
       this._cardContainer.addChild(classTypeSprite);
     }
 
-    const nameText = new Text({ text: this._card.Name, style: { fontSize: 20, fill: 0xfafafa } });
+    const nameText = new Text({ text: this._card.name, style: { fontSize: 20, fill: 0xfafafa } });
     nameText.anchor.set(0.5);
     nameText.position.set(0, 190);
     nameText.label = "Name";
     this._cardContainer.addChild(nameText);
 
     if (this._card instanceof LeaderCard) {
-      const crown = Sprite.from(this._card.Crown);
+      const crown = Sprite.from(this._card.crown);
       crown.anchor.set(0.5, 0);
       crown.scale.set(0.1);
       crown.position.set(105, -187);
@@ -145,15 +149,15 @@ export class CardView extends Container {
       this._statText.destroy(); // Remove old stat text
     }
     // Special display for warrior with rage bonus
-    let attackText = `A: ${this._card.Attack}`;
-    if (this._card.ClassType === ClassType.Warrior && this._card.WarriorRageActivated) {
+    let attackText = `A: ${this._card.attack}`;
+    if (this._card.classType === ClassType.Warrior && this._card.WarriorRageActivated) {
       // Calculate the original attack value (before rage bonus)
-      const originalAttack = Math.floor(this._card.Attack / 1.5);
-      const bonus = this._card.Attack - originalAttack;
+      const originalAttack = Math.floor(this._card.attack / 1.5);
+      const bonus = this._card.attack - originalAttack;
       attackText = `A: ${originalAttack} + (${bonus})`;
     }
 
-    this._statText = new Text({ text: `${attackText} H: ${this._card.Health}`, style: { fontSize: 20, fill: 0xfafafa } });
+    this._statText = new Text({ text: `${attackText} H: ${this._card.health}`, style: { fontSize: 20, fill: 0xfafafa } });
     this._statText.anchor.set(0.5);
     this._statText.position.set(0, 220);
     this._statText.label = "Stats";

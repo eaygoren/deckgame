@@ -1,14 +1,13 @@
 import { Environment } from "../shared/constants";
-import { Color, Faction, Rarity, AttackType, ClassType } from "../shared/enums";
+import { Color, Rarity, AttackType, ClassType } from "../shared/enums";
 import { IAbility, ICard } from "../shared/interfaces";
 
-export class Card {
+export class Card implements ICard {
   private static nextId = 0;
   private _id: number;
   protected _name: string;
   protected _attack: number;
   protected _health: number;
-  protected _faction: Faction;
   protected _rarity: Rarity;
   protected _color: Color;
   protected _cover: string;
@@ -23,7 +22,6 @@ export class Card {
     this._cover = options.cover;
     this._attack = options.attack;
     this._health = options.health;
-    this._faction = options.faction;
     this._rarity = options.rarity;
     this._color = options.color;
     this._attackType = options.attackType;
@@ -34,46 +32,44 @@ export class Card {
   public get Id(): number {
     return this._id;
   }
-  public get Name(): string {
+  public get name(): string {
     return this._name;
   }
-  public get Cover(): string {
+  public get cover(): string {
     return this._cover;
   }
-  public get Attack(): number {
+  public get attack(): number {
     return this._attack;
   }
-  public set Attack(value: number) {
+  public set attack(value: number) {
     this._attack = value;
   }
-  public get Health(): number {
+  public get health(): number {
     return this._health;
   }
-  public set Health(value: number) {
+  public set health(value: number) {
     this._health = value;
   }
-  public get Faction(): Faction {
-    return this._faction;
-  }
-  public get Rarity(): Rarity {
+  public get rarity(): Rarity {
     return this._rarity;
   }
-  public get Color(): Color {
+  public get color(): Color {
     return this._color;
   }
-  public get AttackType(): AttackType {
+  public get attackType(): AttackType {
     return this._attackType;
   }
-  public get ClassType(): ClassType {
+  public get classType(): ClassType {
     return this._classType;
   }
-  public get Ability(): IAbility | undefined {
+  public get ability(): IAbility | undefined {
     return this._ability;
   }
 
-  public set Ability(ability: IAbility | undefined) {
+  public set ability(ability: IAbility | undefined) {
     this._ability = ability;
   }
+
   public get WarriorRageActivated(): boolean {
     return this._warriorRageActivated;
   }
@@ -90,7 +86,6 @@ export class LeaderCard extends Card {
     cover: string,
     attack: number,
     health: number,
-    faction: Faction,
     rarity: Rarity,
     color: Color,
     attackType: AttackType,
@@ -98,19 +93,19 @@ export class LeaderCard extends Card {
     leaderAbility: IAbility,
     crown: string = Environment.crown
   ) {
-    super({ name, cover, attack, health, faction, rarity, color, attackType, classType });
+    super({ name, cover, attack, health, rarity, color, attackType, classType });
     this._leaderAbility = leaderAbility;
     this._crown = crown;
   }
 
-  public get LeaderAbility(): IAbility {
+  public get leaderAbility(): IAbility {
     return this._leaderAbility;
   }
 
-  public get Crown(): string {
+  public get crown(): string {
     return this._crown;
   }
 }
 
-export { Rarity, Faction, Color, AttackType };
+export { Rarity, Color, AttackType };
 export type { IAbility as Ability };

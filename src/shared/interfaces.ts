@@ -1,4 +1,4 @@
-import { Card, Color, Faction, Rarity, AttackType } from "../game/Card";
+import { Card, Color, Rarity, AttackType } from "../game/Card";
 import { Player } from "../game/Player";
 import { CardView } from "../ui/CardView";
 import { ClassType } from "./enums";
@@ -8,12 +8,27 @@ export interface IAbility {
   description: string;
 }
 
+export interface SkillOptions {
+  attacker?: Card;
+  defender?: Card;
+  dealtDamage?: number;
+  ignoreDefense?: boolean;
+  isDefeated?: boolean;
+  isSkillDisabled?: boolean;
+  [key: string]: any;
+}
+
+export interface ISkill {
+  name: string;
+  description: string;
+  useSkill(options: SkillOptions): any;
+}
+
 export interface ICard {
   name: string;
   cover: string;
   attack: number;
   health: number;
-  faction: Faction;
   rarity: Rarity;
   color: Color;
   attackType: AttackType;
@@ -31,21 +46,6 @@ export interface MoveOption {
   attacker: Card;
   defender: Card;
   score: number;
-}
-
-export interface CombatOption2{
-  player: Player;
-  bot: Player;
-  attacker: Card;
-  defender: Card;
-  selectedAttacker: ISelectedCard | null;
-  selectedDefender: ISelectedCard | null;
-  playerCardViews: CardView[];
-  botCardViews: CardView[];
-  attackerView: CardView;
-  defenderView: CardView;
-  attackDamage: number;
-  counterDamage: number;
 }
 
 export interface CombatOption {

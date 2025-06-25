@@ -1,5 +1,5 @@
 import { AttackType, Card, LeaderCard } from "../game/Card";
-import { BroadcastEvents, getInitialHealth } from "../shared/constants";
+import { BroadcastEvents, CharacterList } from "../shared/constants";
 import { ClassType } from "../shared/enums";
 import { CombatOption } from "../shared/interfaces";
 import { CardView } from "../ui/CardView";
@@ -28,6 +28,19 @@ export class CombatManager {
         this._broadcast.on(BroadcastEvents.CHECK_WARRIOR_RAGE, this.handleWarriorAbility.bind(this));
         this._broadcast.on(BroadcastEvents.CHECK_ARCANE_BLAST, this.handleMageAbility.bind(this));
     }
+    
+    // Helper function to get initial health from character data
+    private getInitialHealth = (card: Card): number => {
+        const characterData = Object.values(CharacterList).find(char =>
+            char.name === card.name.replace(/^Leader /, "") // Remove "Leader " prefix if present
+        );
+        if (characterData) {
+            // If it's a leader card, add the leader bonus
+            return card.name.includes("Leader") ? characterData.health + 5 : characterData.health;
+        }
+        // Fallback: assume current health is initial health
+        return card.health;
+    };
 
     public calculateAttackDamage(attacker: CardView, defender: CardView): number {
         let baseDamage = this.handleBaseDamage(attacker, defender);
@@ -36,32 +49,32 @@ export class CombatManager {
     }
 
     public calculateCounterDamage(defender: Card | null): number {
-        if (!defender || defender.Health <= 0) {
+        if (!defender || defender.health <= 0) {
             //console.log("Defender is null or dead, no counter damage.");
             return 0;
         }
 
-        let counterDamage = defender.Attack;
+        let counterDamage = defender.attack;
 
         return counterDamage;
     }
 
     private handleBaseDamage(attacker: CardView, defender: CardView): number {
-        switch (attacker?.card.ClassType) {
+        switch (attacker?.card.classType) {
             case ClassType.Rogue:
                 if (attacker) {
                     return this.handleRogueAbility(attacker);
                 }
         }
 
-        switch (defender?.card.ClassType) {
+        switch (defender?.card.classType) {
             case ClassType.Tank:
-                if (attacker && attacker.card.AttackType === AttackType.Ranged) {
+                if (attacker && attacker.card.attackType === AttackType.Ranged) {
                     return this.handleTankAbility(attacker, defender);
                 }
         }
 
-        return attacker.card.Attack; // Default to attack value if no special ability applies
+        return attacker.card.attack; // Default to attack value if no special ability applies
     }
 
     private handleWarriorAbility(data: { playerCardViews: CardView[], botCardViews: CardView[] }): void {
@@ -76,13 +89,13 @@ export class CombatManager {
             const card = cardView?.card;
             if (!card) continue;
 
-            if (card.ClassType === ClassType.Warrior && card.Health > 0 && !card.WarriorRageActivated) {
-                const initialHealth = getInitialHealth(card);
-                const currentHealthPercentage = (card.Health / initialHealth) * 100;
+            if (card.classType === ClassType.Warrior && card.health > 0 && !card.WarriorRageActivated) {
+                const initialHealth = this.getInitialHealth(card);
+                const currentHealthPercentage = (card.health / initialHealth) * 100;
 
                 if (currentHealthPercentage <= 50) {
-                    const attackBonus = Math.floor(card.Attack * 0.5);
-                    card.Attack += attackBonus;
+                    const attackBonus = Math.floor(card.attack * 0.5);
+                    card.attack += attackBonus;
                     card.WarriorRageActivated = true;
 
                     //console.log(`${card.Name} enters berserker rage! Attack increased by ${attackBonus}!`);
@@ -106,7 +119,7 @@ export class CombatManager {
         const { attacker, opponentCardViews } = data;
 
         // IMPORTANT: Only apply if the attacker is actually a Mage
-        if (attacker.card.ClassType !== ClassType.Mage) {
+        if (attacker.card.classType !== ClassType.Mage) {
             //console.log(`ERROR: MageAbility called for non-Mage card: ${attacker.Name} (ClassType: ${attacker.ClassType})`);
             return;
         }
@@ -115,9 +128,9 @@ export class CombatManager {
         const randomTarget = this.getRandomOpponentTarget(opponentCardViews);
 
         if (randomTarget) {
-            const mageDamage = Math.floor(attacker.card.Attack * 0.5);
+            const mageDamage = Math.floor(attacker.card.attack * 0.5);
 
-            randomTarget.Health = Math.max(0, randomTarget.Health - mageDamage);
+            randomTarget.health = Math.max(0, randomTarget.health - mageDamage);
             //console.log(`${attacker.Name}'s Arcane Blast hits ${randomTarget.Name} for ${mageDamage} damage!`); // Find the target's view and show ability message and damage
 
             const targetView = opponentCardViews.find(view => view.card.Id === randomTarget.Id);
@@ -141,7 +154,7 @@ export class CombatManager {
 
     private getRandomOpponentTarget(opponentCardViews: CardView[]): Card | null {
         // Get all non-leader cards (we don't want to exclude originalTarget since it's not in opponent hand)
-        const availableTargets = opponentCardViews.map(view => view.card).filter(card => !(card instanceof LeaderCard) && card.Health > 0);
+        const availableTargets = opponentCardViews.map(view => view.card).filter(card => !(card instanceof LeaderCard) && card.health > 0);
 
         if (availableTargets.length === 0) return null;
 
@@ -168,9 +181,9 @@ export class CombatManager {
                 //console.log("Cannot show the message!");
             }
 
-            return Math.floor(attacker.card.Attack * 2);
+            return Math.floor(attacker.card.attack * 2);
         }
-        return attacker.card.Attack;
+        return attacker.card.attack;
     }
 
     private handleTankAbility(attacker: CardView, defender: CardView): number {
@@ -186,17 +199,17 @@ export class CombatManager {
             });
         }
 
-        return Math.floor(attacker.card.Attack * 0.5);
+        return Math.floor(attacker.card.attack * 0.5);
     }
 
     public completePlayerCombat(data: CombatOption) {
         const { attacker, defender, attackDamage, counterDamage } = data;
 
         // Hasar uygula
-        defender.card.Health = Math.max(0, defender.card.Health - attackDamage);
+        defender.card.health = Math.max(0, defender.card.health - attackDamage);
 
-        if (attacker.card.AttackType === AttackType.Melee) {
-            attacker.card.Health = Math.max(0, attacker.card.Health - counterDamage);
+        if (attacker.card.attackType === AttackType.Melee) {
+            attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
         }
 
         if (attacker && !attacker.destroyed) {
@@ -219,10 +232,10 @@ export class CombatManager {
         const { attacker, defender, attackDamage, counterDamage } = data;
 
         // Hasar uygula
-        defender.card.Health = Math.max(0, defender.card.Health - attackDamage);
+        defender.card.health = Math.max(0, defender.card.health - attackDamage);
 
-        if (attacker.card.AttackType === AttackType.Melee) {
-            attacker.card.Health = Math.max(0, attacker.card.Health - counterDamage);
+        if (attacker.card.attackType === AttackType.Melee) {
+            attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
         }
 
         // Stats güncelle - null check
