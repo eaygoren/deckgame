@@ -1,6 +1,7 @@
-import { AttackType, Card, LeaderCard } from "../game/Card";
-import { BroadcastEvents, CharacterList } from "../shared/constants";
-import { ClassType } from "../shared/enums";
+import { Card, LeaderCard } from "../game/Card";
+import { CharacterList } from "../shared/constants/characters";
+import { BroadcastEvents } from "../shared/constants/events";
+import { AttackType, ClassType } from "../shared/enums";
 import { CombatOption } from "../shared/interfaces";
 import { CardView } from "../ui/CardView";
 import { Broadcast } from "../utils/Broadcast";

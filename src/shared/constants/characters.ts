@@ -1,44 +1,42 @@
-import { Color, Rarity, AttackType } from "../game/Card";
-import { ClassType } from "./enums";
-import { IAbility } from "./interfaces";
+import { AttackType, ClassType, Color, Rarity } from "../enums";
 
 export const Characters = {
-    Aerwyn: "Aerwyn",
-    Alien: "Alien",
-    Arcangel: "Arcangel",
-    Arcmage: "Arcmage",
-    Assassin: "Assassin",
+    Aerwyn: "Aerwyn", // %25 ihtimalle saldırılardan kaçınır
+    Alien: "Alien", // hasar aldıktan sonra görünmez olur, görünmezken rakipler counter saldırı yapamaz
+    Archangel: "Archangel", // saldırı yaptığı tur sonrası, takımındaki en düşük canı olan kartı (kendisi hariç), verdiği hasarın %50'si kadar iyileştirir
+    Archmage: "Archmage",
+    Assassin: "Assassin", // kritik ihtimalini 2 katına çıkarır, %25 ihtimalle counter saldırı ile kritik hasar verebilir
     Cerberus: "Cerberus",
     Cyclop: "Cyclop",
-    Dragon: "Dragon",
+    Dragon: "Dragon", // hasar verdiği rakipleri 1 tur yakar, yanan rakipler 1 tur boyunca %50 saldırı gücü kaybeder
     // Dwarf: "Dwarf",
-    Elf: "Elf",
-    Ent: "Ent",
-    Gunslinger: "Gunslinger",
-    Illusionist: "Illusionist",
-    Joker: "Joker",
-    Knight: "Knight",
-    Lich: "Lich",
+    Elf: "Elf", // tüm hasar düşürme etkilerini yok sayar
+    Ent: "Ent", // saldırdığı rakibi, bir tur boyunca sadece Ent'e saldırabilir
+    Gunslinger: "Gunslinger", // saldırdığı rakip işaretlenir, işaretli rakip 1 tur boyunca %50 daha fazla hasar alır
+    Illusionist: "Illusionist", // oyun başına bir kez olmak üzere, rakibin canı ile saldırı gücünü değiştirir
+    Joker: "Joker", // saldırdığı rakibin hasarı kendi hasarından yüksekse, rakibin hasarını kendi hasarına eşitler
+    Knight: "Knight", // tur başında 1 takım arkadaşını korur, koruduğu kart hasarın yarısını alır ve hasarın diğer yarısını kendisi alır
+    Lich: "Lich", // rakibi 1 tur dondurur, donan kart bir 1 tur saldırı yapamaz
     // Medusa: "Medusa",
     // Minotaur: "Minotaur",
     Monk: "Monk",
     // Mummy: "Mummy",
     // Naga: "Naga",
     Ra: "Ra",
-    // Phoenix: "Phoenix",
+    // Phoenix: "Phoenix", // yumurta formuna geçer, 1 tur sonra yeniden doğar
     // Pirate: "Pirate",
-    Reaper: "Reaper",
+    Reaper: "Reaper", // rakip öldürdüğünde takımın destesine hayalet ekler
     // Robot: "Robot",
-    Samurai: "Samurai",
-    Siren: "Siren",
+    Samurai: "Samurai", // rakibi 1 tur kanatır, kanayan rakip bir sonraki tur 1 hasar alır
+    Siren: "Siren", // rakibi susturur, susturulan kart bir 1 tur skill kullanamaz
     // Skeleton: "Skeleton",
-    Vampire: "Vampire",
+    Vampire: "Vampire", // verdiği hasarın %50'si kadarını can çalar
     Werewolf: "Werewolf",
     // Witch: "Witch",
     Wukong: "Wukong",
     Zeus: "Zeus",
-    Zombie: "Zombie"
-}
+    Zombie: "Zombie" //rakibi 1 tur zombie yapar, zombie olan kart 1 tur boyunca skill kullanamaz
+};
 
 export const CharacterList = {
     Aerwyn: {
@@ -61,9 +59,9 @@ export const CharacterList = {
         attackType: AttackType.Melee,
         classType: ClassType.Rogue
     },
-    Arcangel: {
-        name: Characters.Arcangel,
-        cover: Characters.Arcangel.toLowerCase(),
+    Archangel: {
+        name: Characters.Archangel,
+        cover: Characters.Archangel.toLowerCase(),
         attack: 9,
         health: 7,
         rarity: Rarity.Legendary,
@@ -71,9 +69,9 @@ export const CharacterList = {
         attackType: AttackType.Melee,
         classType: ClassType.Mage
     },
-    Arcmage: {
-        name: Characters.Arcmage,
-        cover: Characters.Arcmage.toLowerCase(),
+    Archmage: {
+        name: Characters.Archmage,
+        cover: Characters.Archmage.toLowerCase(),
         attack: 5,
         health: 6,
         rarity: Rarity.Rare,
@@ -292,65 +290,3 @@ export const CharacterList = {
         classType: ClassType.Tank
     },
 };
-
-export const MageAbility: IAbility = {
-    name: "Arcane Blast",
-    description: "After attacking, deal 50% base damage to one random opponent (except leader)."
-};
-
-export const RogueAbility: IAbility = {
-    name: "Critical Strike",
-    description: "25% chance to deal double damage on attack."
-};
-
-export const TankAbility: IAbility = {
-    name: "Iron Wall",
-    description: "Take 50% less damage from ranged attacks."
-};
-
-export const WarriorAbility: IAbility = {
-    name: "Berserker Rage",
-    description: "Permanently gain 50% more attack when health drops below 50%."
-};
-
-export const ClassAbilities = {
-    [ClassType.Mage]: () => ({ ...MageAbility }),
-    [ClassType.Rogue]: () => ({ ...RogueAbility }),
-    [ClassType.Tank]: () => ({ ...TankAbility }),
-    [ClassType.Warrior]: () => ({ ...WarriorAbility }),
-};
-
-export const CARD_POSITIONS = [
-    { x: 225, slot: 0 },  // Sol 1
-    { x: 575, slot: 1 },  // Sol 2  
-    { x: 925, slot: 2 }, // Orta (Leader)
-    { x: 1275, slot: 3 }, // Sağ 1
-    { x: 1625, slot: 4 }  // Sağ 2
-];
-
-export const Environment = {
-    crown: "crown",
-    deck: "deck",
-    melee: "melee",
-    ranged: "ranged",
-    warrior: "warrior",
-    mage: "mage",
-    rogue: "rogue",
-    tank: "tank",
-}
-
-export const BroadcastEvents = {
-    COMPLETE_PLAYER_COMBAT: "completeplayercombat",
-    PLAYER_COMBAT_COMPLETED: "playercombatcompleted",
-    COMPLETE_BOT_COMBAT: "completebotcombat",
-    BOT_COMBAT_COMPLETED: "botcombatcompleted",
-    CHECK_FOR_WINNER: "checkforwinner",
-    RESET_INTERACTION: "restartgame",
-    SHOW_ABILITY_MESSAGE: "showabilitymessage",
-    SHOW_DAMAGE_ANIMATION: "showdamageanimation",
-    CHECK_WARRIOR_RAGE: "checkwarriorrage",
-    CHECK_ARCANE_BLAST: "checkarcaneblast",
-    ADD_NEW_CARDS: "addnewcards",
-    NEW_CARDS_ADDED: "newcardsadded",
-    CARDS_REMOVED: "cardsremoved",
-}

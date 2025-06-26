@@ -63,8 +63,4 @@ export class Deck {
   public get leader(): LeaderCard | null {
     return this._leader;
   }
-
-  public drawCard(): Card | null {
-    return this.drawRandomCard();
-  }
 }

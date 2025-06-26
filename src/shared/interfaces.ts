@@ -1,7 +1,6 @@
-import { Card, Color, Rarity, AttackType } from "../game/Card";
-import { Player } from "../game/Player";
+import { Card } from "../game/Card";
 import { CardView } from "../ui/CardView";
-import { ClassType } from "./enums";
+import { AttackType, ClassType, Color, Rarity } from "./enums";
 
 export interface IAbility {
   name: string;
@@ -24,6 +23,11 @@ export interface ISkill {
   useSkill(options: SkillOptions): any;
 }
 
+export interface ILeaderCard{
+  card: ICard;
+  crown: string;
+}
+
 export interface ICard {
   name: string;
   cover: string;
@@ -33,13 +37,7 @@ export interface ICard {
   color: Color;
   attackType: AttackType;
   classType: ClassType;
-  ability?: IAbility;
-  crown?: string;
-}
-
-export interface ISelectedCard {
-  view: CardView;
-  owner: Player;
+  ability: IAbility;
 }
 
 export interface MoveOption {

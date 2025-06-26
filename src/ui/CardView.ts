@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text } from "pixi.js";
-import { Card, AttackType, Color, LeaderCard } from "../game/Card";
-import { Environment } from "../shared/constants";
-import { ClassType } from "../shared/enums";
+import { Card, LeaderCard } from "../game/Card";
+import { AttackType, ClassType, Color } from "../shared/enums";
+import { Environment } from "../shared/constants/gameConfig";
 
 export class CardView extends Container {
   private _card: Card;

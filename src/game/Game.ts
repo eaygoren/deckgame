@@ -1,16 +1,19 @@
 import { Application } from "pixi.js";
-import { Card, AttackType, LeaderCard } from "./Card";
+import { Card, LeaderCard } from "./Card";
 import { Deck } from "./Deck";
 import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
-import { BroadcastEvents, CARD_POSITIONS, CharacterList, ClassAbilities } from "../shared/constants";
 import { MoveOption, CombatOption } from "../shared/interfaces";
-import { ClassType, Turn } from "../shared/enums";
+import { AttackType, ClassType, Turn } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
 import gsap from "gsap";
+import { BroadcastEvents } from "../shared/constants/events";
+import { CharacterList } from "../shared/constants/characters";
+import { ClassAbilities } from "../shared/constants/abilities";
+import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
 
 export class Game {
   private _app: Application;
@@ -58,19 +61,11 @@ export class Game {
     // 1 leader and 9 random cards
     const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
     const leaderKey = keys[Math.floor(Math.random() * keys.length)];
-    const leaderData = CharacterList[leaderKey]; const leader = new LeaderCard(
-      leaderData.name,
-      leaderData.cover,
-      leaderData.attack + 2, // Make leader stronger
-      leaderData.health + 5,
-      leaderData.rarity,
-      leaderData.color,
-      leaderData.attackType,
-      leaderData.classType,
-      { name: "Leader", description: "Leader ability" }
+    const leaderData = CharacterList[leaderKey];
+    const leader = new LeaderCard(
+      { ...leaderData, ability: ClassAbilities[leaderData.classType]() },
+      Environment.crown
     );
-    // Set leader's class ability as well
-    leader.ability = ClassAbilities[leaderData.classType]();
 
     const deck = new Deck();
     deck.setLeader(leader);

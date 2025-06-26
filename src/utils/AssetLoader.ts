@@ -1,5 +1,6 @@
 import { Assets } from "pixi.js";
-import { Characters, Environment } from "../shared/constants";
+import { Characters } from "../shared/constants/characters";
+import { Environment } from "../shared/constants/gameConfig";
 
 export class AssetLoader {
   public static async loadAll(): Promise<void> {
