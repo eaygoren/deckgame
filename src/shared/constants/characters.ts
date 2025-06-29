@@ -2,7 +2,7 @@ import { AttackType, ClassType, Color, Rarity } from "../enums";
 
 export const Characters = {
     Aerwyn: "Aerwyn", // %25 ihtimalle saldırılardan kaçınır
-    Alien: "Alien", // hasar aldıktan sonra görünmez olur, görünmezken rakipler counter saldırı yapamaz
+    Alien: "Alien", // hasar aldıktan sonra 1 tur görünmez olur, görünmezken rakipler counter saldırı yapamaz
     Archangel: "Archangel", // saldırı yaptığı tur sonrası, takımındaki en düşük canı olan kartı (kendisi hariç), verdiği hasarın %50'si kadar iyileştirir
     Archmage: "Archmage",
     Assassin: "Assassin", // kritik ihtimalini 2 katına çıkarır, %25 ihtimalle counter saldırı ile kritik hasar verebilir
@@ -13,6 +13,7 @@ export const Characters = {
     Elf: "Elf", // tüm hasar düşürme etkilerini yok sayar
     Ent: "Ent", // saldırdığı rakibi, bir tur boyunca sadece Ent'e saldırabilir
     Gunslinger: "Gunslinger", // saldırdığı rakip işaretlenir, işaretli rakip 1 tur boyunca %50 daha fazla hasar alır
+    Hathor: "Hathor", // takımındaki Ra ile birlikte saldırır
     Illusionist: "Illusionist", // oyun başına bir kez olmak üzere, rakibin canı ile saldırı gücünü değiştirir
     Joker: "Joker", // saldırdığı rakibin hasarı kendi hasarından yüksekse, rakibin hasarını kendi hasarına eşitler
     Knight: "Knight", // tur başında 1 takım arkadaşını korur, koruduğu kart hasarın yarısını alır ve hasarın diğer yarısını kendisi alır
@@ -22,15 +23,15 @@ export const Characters = {
     Monk: "Monk",
     // Mummy: "Mummy",
     // Naga: "Naga",
-    Ra: "Ra",
-    // Phoenix: "Phoenix", // yumurta formuna geçer, 1 tur sonra yeniden doğar
+    Phoenix: "Phoenix", // yumurta formuna geçer, 1 tur sonra yeniden doğar, yumurta formundayken saldırı yapamaz
     // Pirate: "Pirate",
+    Ra: "Ra", // takımındaki Hathor ile birlikte saldırır
     Reaper: "Reaper", // rakip öldürdüğünde takımın destesine hayalet ekler
     // Robot: "Robot",
     Samurai: "Samurai", // rakibi 1 tur kanatır, kanayan rakip bir sonraki tur 1 hasar alır
     Siren: "Siren", // rakibi susturur, susturulan kart bir 1 tur skill kullanamaz
     // Skeleton: "Skeleton",
-    Vampire: "Vampire", // verdiği hasarın %50'si kadarını can çalar
+    Vampire: "Vampire", // saldırdığı rakibe verdiği hasarın %50'si kadarını can çalar
     Werewolf: "Werewolf",
     // Witch: "Witch",
     Wukong: "Wukong",
@@ -149,6 +150,16 @@ export const CharacterList = {
         attackType: AttackType.Ranged,
         classType: ClassType.Rogue
     },
+    Hathor: {
+        name: Characters.Hathor,
+        cover: Characters.Hathor.toLowerCase(),
+        attack: 7,
+        health: 6,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
+        attackType: AttackType.Melee,
+        classType: ClassType.Mage
+    },
     Illusionist: {
         name: Characters.Illusionist,
         cover: Characters.Illusionist.toLowerCase(),
@@ -162,7 +173,7 @@ export const CharacterList = {
     Joker: {
         name: Characters.Joker,
         cover: Characters.Joker.toLowerCase(),
-        attack: 7,
+        attack: 3,
         health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
@@ -198,6 +209,16 @@ export const CharacterList = {
         color: Color.Common,
         attackType: AttackType.Melee,
         classType: ClassType.Warrior
+    },
+    Phoenix: {
+        name: Characters.Phoenix,
+        cover: Characters.Phoenix.toLowerCase(),
+        attack: 6,
+        health: 8,
+        rarity: Rarity.Legendary,
+        color: Color.Legendary,
+        attackType: AttackType.Ranged,
+        classType: ClassType.Mage
     },
     Ra: {
         name: Characters.Ra,

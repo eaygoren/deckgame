@@ -1,67 +1,163 @@
 import { Environment } from "../shared/constants/gameConfig";
 import { Color, Rarity, AttackType, ClassType } from "../shared/enums";
 import { IAbility, ICard, ILeaderCard } from "../shared/interfaces";
+import { CombatContext, EffectType, ISkill, SkillEffect, SkillResult } from "../shared/interfaces/skillInterfaces";
+import { SkillFactory } from "./skills/SkillFactory";
 
 export class Card implements ICard {
   private static nextId = 0;
   protected _id: number;
   protected _name: string;
+  protected _cover: string;
   protected _attack: number;
   protected _health: number;
   protected _rarity: Rarity;
   protected _color: Color;
-  protected _cover: string;
   protected _attackType: AttackType;
   protected _classType: ClassType;
   protected _ability: IAbility;
+  protected _skill: ISkill | null = null;
+  protected _activeEffects: SkillEffect[] = [];
+  protected _skillUsedThisTurn: boolean = false;
+  protected _maxAttack?: number; // Orijinal attack değerini saklamak için
+  protected _maxHealth: number; // Başlangıç canını saklamak için
+  protected _effectCover?: string;
   protected _warriorRageActivated: boolean = false;
   
   constructor(options: ICard) {
     this._id = Card.nextId++;
     this._name = options.name;
-    this._cover = options.cover;
     this._attack = options.attack;
     this._health = options.health;
     this._rarity = options.rarity;
     this._color = options.color;
+    this._cover = options.cover;
     this._attackType = options.attackType;
     this._classType = options.classType;
     this._ability = options.ability;
+    this._maxHealth = this._health; // Başlangıç canını sakla
+    this._skill = SkillFactory.createSkill(this._name);
+  }
+
+  // Skill kullanma
+  public useSkill(target?: Card, context?: CombatContext): SkillResult | null {
+    if (!this._skill || this.hasEffect(EffectType.Silence) || this._skillUsedThisTurn) {
+      return null;
+    }
+
+    if (!this._skill.canUse(this, target, context)) {
+      return null;
+    }
+
+    const result = this._skill.execute(this, target, context);
+    if (result.success) {
+      this._skillUsedThisTurn = true;
+    }
+
+    return result;
+  }
+
+  // Effect yönetimi
+  public addEffect(effect: SkillEffect): void {
+    this.removeEffect(effect.type);
+    this._activeEffects.push(effect);
+
+    // Generic cover değişikliği
+    if (effect.coverChange) {
+      this._effectCover = effect.coverChange;
+    }
+
+    // Attack reduction için original attack'ı sakla
+    if (effect.type === EffectType.AttackReduction) {
+      if (!this._maxAttack) {
+        this._maxAttack = this._attack;
+      }
+
+      // Attack'ı azalt
+      const reductionAmount = Math.floor(this._attack * (effect.value || 0.5));
+      this._attack = Math.max(1, this._attack - reductionAmount);
+    }
+  }
+
+  public removeEffect(effectType: EffectType): void {
+    this._activeEffects = this._activeEffects.filter(e => e.type !== effectType);
+  }
+
+  public hasEffect(effectType: EffectType): boolean {
+    return this._activeEffects.some(e => e.type === effectType);
+  }
+
+  public updateEffects(): void {
+    this._activeEffects = this._activeEffects.filter(effect => {
+      effect.duration--;
+
+      // Effect bittiğinde temizlik yap
+      if (effect.duration <= 0) {
+        if (effect.coverChange) {
+          this._effectCover = undefined;
+        }
+
+        // Attack reduction bittiğinde attack'ı restore et
+        if (effect.type === EffectType.AttackReduction && this._maxAttack) {
+          this._attack = this._maxAttack; // Original attack'a geri dön
+          this._maxAttack = undefined; // Temizle
+        }
+      }
+
+      return effect.duration > 0;
+    });
+
+    this._skillUsedThisTurn = false;
   }
 
   public get Id(): number {
     return this._id;
   }
+
   public get name(): string {
     return this._name;
   }
+
   public get cover(): string {
     return this._cover;
   }
+
+  public set cover(value: string) {
+    this._cover = value;
+  }
+
   public get attack(): number {
     return this._attack;
   }
+
   public set attack(value: number) {
     this._attack = value;
   }
+
   public get health(): number {
     return this._health;
   }
+
   public set health(value: number) {
     this._health = value;
   }
+
   public get rarity(): Rarity {
     return this._rarity;
   }
+
   public get color(): Color {
     return this._color;
   }
+
   public get attackType(): AttackType {
     return this._attackType;
   }
+
   public get classType(): ClassType {
     return this._classType;
   }
+
   public get ability(): IAbility {
     return this._ability;
   }
@@ -70,12 +166,57 @@ export class Card implements ICard {
     this._ability = ability;
   }
 
+  public get skill(): ISkill | null {
+    return this._skill;
+  }
+
+  public set skill(skill: ISkill | null) {
+    this._skill = skill;
+  }
+
+  public get activeEffects(): SkillEffect[] {
+    return this._activeEffects;
+  }
+
+  public set activeEffects(effects: SkillEffect[]) {
+    this._activeEffects = effects;
+  }
+
+  public get maxAttack(): number | undefined {
+    return this._maxAttack;
+  }
+
+  public set maxAttack(value: number | undefined) {
+    this._maxAttack = value;
+  }
+
+  public get maxHealth(): number {
+    return this._maxHealth;
+  }
+
+  public set maxHealth(value: number) {
+    this._maxHealth = value;
+  }
+
+  public get effectCover(): string | undefined {
+    return this._effectCover;
+  }
+
+  public set effectCover(value: string | undefined) {
+    this._effectCover = value;
+  }
+
   public get WarriorRageActivated(): boolean {
     return this._warriorRageActivated;
   }
 
   public set WarriorRageActivated(value: boolean) {
     this._warriorRageActivated = value;
+  }
+
+  public get currentCover(): string {
+    // Eğer effectCover varsa onu kullan, yoksa normal cover'ı döndür
+    return this._effectCover || this._cover;
   }
 }
 
@@ -95,7 +236,8 @@ export class LeaderCard extends Card implements ILeaderCard {
       color: card.color,
       attackType: card.attackType,
       classType: card.classType,
-      ability: card.ability
+      ability: card.ability,
+      skill: card.skill || null // Ensure skill is set if available
     });
 
     this._crown = crown;
@@ -111,16 +253,9 @@ export class LeaderCard extends Card implements ILeaderCard {
       color: this._color,
       attackType: this._attackType,
       classType: this._classType,
-      ability: this._ability
+      ability: this._ability,
+      skill: this._skill
     };
-  }
-
-  public get ability(): IAbility {
-    return this._ability;
-  }
-
-  public set ability(ability: IAbility) {
-    this._ability = ability;
   }
 
   public get crown(): string {

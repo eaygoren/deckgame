@@ -1,6 +1,7 @@
 import { Card } from "../game/Card";
 import { CardView } from "../ui/CardView";
 import { AttackType, ClassType, Color, Rarity } from "./enums";
+import { ISkill, SkillEffect } from "./interfaces/skillInterfaces";
 
 export interface IAbility {
   name: string;
@@ -15,12 +16,6 @@ export interface SkillOptions {
   isDefeated?: boolean;
   isSkillDisabled?: boolean;
   [key: string]: any;
-}
-
-export interface ISkill {
-  name: string;
-  description: string;
-  useSkill(options: SkillOptions): any;
 }
 
 export interface ILeaderCard{
@@ -38,6 +33,10 @@ export interface ICard {
   attackType: AttackType;
   classType: ClassType;
   ability: IAbility;
+  skill?: ISkill | null;
+  activeEffects?: SkillEffect[];
+  skillUsedThisTurn?: boolean; // Yeni özellik, bu kartın bu turda skill kullanılıp kullanılmadığını saklar
+  maxHealth?: number; // Yeni özellik, başlangıç canını saklamak için
 }
 
 export interface MoveOption {

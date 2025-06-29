@@ -89,7 +89,7 @@ export class AnimationManager {
                         this._battlefield.battleLog.removeChild(damageText);
                     }
                     if (targetView && !targetView.destroyed) {
-                        targetView.update();
+                        targetView.updateStats();
                     }
                     resolve();
                 });
@@ -248,8 +248,8 @@ export class AnimationManager {
         //console.log("Bot dead cards:", botDeadViews.map(v => v.card.Name));
 
         // Hayatta kalan kartların view'larını güncelle
-        playerAliveViews.forEach(view => view.update());
-        botAliveViews.forEach(view => view.update());
+        playerAliveViews.forEach(view => view.updateStats());
+        botAliveViews.forEach(view => view.updateStats());
 
         // Animasyonla ölü kartları kaldır
         const deadAnimations: Promise<void>[] = [];
@@ -352,7 +352,7 @@ export class AnimationManager {
             if (existingView) {
                 const finalX = playerStartX + i * 350;
                 // Update the view stats before repositioning
-                existingView.update();
+                existingView.updateStats();
                 gsap.to(existingView, {
                     x: finalX,
                     duration: 0.3,
@@ -386,7 +386,7 @@ export class AnimationManager {
             if (existingView) {
                 const finalX = botStartX + i * 350;
                 // Update the view stats before repositioning
-                existingView.update();
+                existingView.updateStats();
                 gsap.to(existingView, {
                     x: finalX,
                     duration: 0.3,

@@ -14,6 +14,7 @@ import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
 import { ClassAbilities } from "../shared/constants/abilities";
 import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
+import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 
 export class Game {
   private _app: Application;
@@ -41,11 +42,43 @@ export class Game {
     this._bot = this.createPlayer("Bot");
 
     this.eventListeners();
+    // setTimeout(() => {
+    //   this.testSkillSystem();
+    // }, 1000);
+  }
+
+  private testSkillSystem(): void {
+    console.log("=== SKILL SYSTEM TEST ===");
+
+    console.log("\n\n=== Player Hand ===");
+    // Player kartlarındaki skill'leri test et
+    this._player.hand.forEach(card => {
+      if (card.skill) {
+        console.log(`\n${card.name} skill: ${card.skill.name} - ${card.skill.description}`);
+        console.log(`\nTrigger timing: ${card.skill.triggerTiming}`);
+      } else {
+        console.log(`\n${card.name} has no skill`);
+      }
+    });
+
+    console.log("\n\n=== Bot Hand ===");
+    // Bot kartlarındaki skill'leri test et
+    this._bot.hand.forEach(card => {
+      if (card.skill) {
+        console.log(`\n${card.name} skill: ${card.skill.name} - ${card.skill.description}`);
+        console.log(`\nTrigger timing: ${card.skill.triggerTiming}`);
+      } else {
+        console.log(`\n${card.name} has no skill`);
+      }
+    });
+
+    console.log("\n\n=== TEST COMPLETED ===");
   }
 
   private eventListeners() {
     this._broadcast.on(BroadcastEvents.PLAYER_COMBAT_COMPLETED, this.onPlayerCombatCompleted.bind(this));
     this._broadcast.on(BroadcastEvents.BOT_COMBAT_COMPLETED, this.onBotCombatCompleted.bind(this));
+    this._broadcast.on(BroadcastEvents.UPDATE_CARD_AFTER_SKILL, this.onUpdateCardAfterSkill.bind(this));
     this._broadcast.on(BroadcastEvents.CHECK_FOR_WINNER, this.checkForWinner.bind(this));
     this._broadcast.on(BroadcastEvents.RESET_INTERACTION, this.handleInteraction.bind(this));
     this._broadcast.on(BroadcastEvents.ADD_NEW_CARDS, this.addNewCards.bind(this));
@@ -190,6 +223,11 @@ export class Game {
     if (this._turn !== Turn.Player || !this._attacker) return;
     if (this._defender && this._defender === view) return;
 
+    // TURN BAŞINDA SKILL KONTROLÜ - Player turn'ünün ilk saldırısında
+    if (!this._defender) {
+      this.triggerStartOfTurnSkills();
+    }
+
     // Lider kartına sadece karşı tarafın sadece lideri kaldığında saldırılabilir
     if (view.card instanceof LeaderCard) {
       const nonLeaderCards = this._bot.hand.filter(c => !(c instanceof LeaderCard));
@@ -222,6 +260,9 @@ export class Game {
   }
 
   private botTurn() {
+    // BOT TURN BAŞLANGICI - Effect'leri güncelle ve start of turn skill'leri tetikle
+    this.triggerStartOfTurnSkills();
+
     // Bot için hedef seçimi: Lider kartına sadece oyuncunun sadece lideri kaldığında saldırabilir
     const playerNonLeaderCards = this._player.hand.filter(c => !(c instanceof LeaderCard));
     let availableTargetViews = this._playerCardViews;
@@ -419,11 +460,126 @@ export class Game {
     };
   }
 
+  // Player turn sonu - Player'ın uyguladığı effect'ler zarar verir
+  private applyPlayerTurnEndEffects(): void {
+    // Player'ın uyguladığı effect'ler aktif olsun
+    this._bot.hand.forEach(card => {
+      this.applyEffectDamageIfOwner(card, "player", "Player turn end");
+    });
+
+    this._botCardViews.forEach(view => {
+      view.updateCover(); // Bot kartlarının güncellenmesi
+    });
+  }
+
+  // Bot turn sonu - Bot'un uyguladığı effect'ler zarar verir  
+  private applyBotTurnEndEffects(): void {
+    // Bot'un uyguladığı effect'ler aktif olsun
+    this._player.hand.forEach(card => {
+      this.applyEffectDamageIfOwner(card, "bot", "Bot turn end");
+    });
+
+    this._playerCardViews.forEach(view => {
+      view.updateCover(); // Player kartlarının güncellenmesi
+    });
+  }
+
+  // Effect damage - sadece belirli owner'ın effect'leri çalışır
+  private applyEffectDamageIfOwner(card: Card, ownerType: "player" | "bot", turnInfo: string): void {
+    if (!card.activeEffects) return;
+
+    card.activeEffects.forEach(effect => {
+      // Effect'in owner'ını kontrol et (effect'e owner property'si eklemek gerekir)
+      // Şimdilik basit kontrol: hangi turn'daysa o effect'leri uygula
+
+      switch (effect.type) {
+        case EffectType.Bleed:
+          const bleedDamage = effect.value || 1;
+          card.health = Math.max(0, card.health - bleedDamage);
+
+          const cardView = this.findCardView(card);
+          if (cardView) {
+            cardView.updateStats();
+          }
+
+          this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            x: cardView?.x,
+            y: cardView?.y,
+            message: `${card.name} bleeds for ${bleedDamage} damage! (${turnInfo})`,
+            color: "#ff0000"
+          });
+          break;
+        case EffectType.Burn:
+          const burnDamage = effect.value || 1;
+          card.health = Math.max(0, card.health - burnDamage);
+
+          const burnCardView = this.findCardView(card);
+          if (burnCardView) {
+            burnCardView.updateStats();
+          }
+
+          this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            x: burnCardView?.x,
+            y: burnCardView?.y,
+            message: `${card.name} burns for ${burnDamage} damage! (${turnInfo})`,
+            color: "#ff4500"
+          });
+          break;
+      }
+    });
+  }
+
+  private findCardView(card: Card): CardView | null {
+    // Player kartlarında ara
+    const playerView = this._playerCardViews.find(view => view.card === card);
+    if (playerView) return playerView;
+
+    // Bot kartlarında ara
+    const botView = this._botCardViews.find(view => view.card === card);
+    if (botView) return botView;
+
+    return null;
+  }
+
+  // Start of turn skill'leri
+  private triggerStartOfTurnSkills(): void {
+    const allCards = [...this._playerCardViews, ...this._botCardViews];
+
+    allCards.forEach(view => {
+      if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn) {
+        const context: CombatContext = {
+          attacker: view.card,
+          defender: null,
+          damage: 0,
+          isCounterAttack: false,
+          allPlayerCards: this._player.hand,
+          allBotCards: this._bot.hand
+        };
+
+        const result = view.card.useSkill(undefined, context);
+        if (result?.success && result.message) {
+          this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            x: view.x,
+            y: view.y,
+            message: result.message,
+            color: "#9932cc"
+          });
+        }
+      }
+    });
+  }
+
   private onPlayerCombatCompleted() {
     this._attacker = null;
     this._defender = null;
 
+    this._player.hand.forEach(card => {
+      card.updateEffects();
+    });
+
     this._broadcast.emit(BroadcastEvents.CHECK_WARRIOR_RAGE, { playerCardViews: this._playerCardViews, botCardViews: this._botCardViews });
+
+    this.applyPlayerTurnEndEffects();
 
     // Ölü kartları kaldır (animasyonla)
     this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
@@ -434,13 +590,27 @@ export class Game {
   }
 
   private onBotCombatCompleted() {
+    this._bot.hand.forEach(card => {
+      card.updateEffects();
+    });
+
     this._broadcast.emit(BroadcastEvents.CHECK_WARRIOR_RAGE, { playerCardViews: this._playerCardViews, botCardViews: this._botCardViews });
+
+    this.applyBotTurnEndEffects();
 
     // Ölü kartları kaldır (animasyonla)
     this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
 
     // Bot turn'ü bitir
     this._turn = Turn.Player;
+  }
+
+  private onUpdateCardAfterSkill(data: { targetCard: Card }): void {
+    const cardView = this.findCardView(data.targetCard);
+    if (cardView) {
+      cardView.updateStats();
+      cardView.updateCover();
+    }
   }
 
   private resolveZIndex(attacker: Player) {

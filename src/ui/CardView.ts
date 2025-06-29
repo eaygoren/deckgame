@@ -1,12 +1,16 @@
-import { Container, Graphics, Sprite, Text } from "pixi.js";
+import { Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import { Card, LeaderCard } from "../game/Card";
 import { AttackType, ClassType, Color } from "../shared/enums";
 import { Environment } from "../shared/constants/gameConfig";
 
 export class CardView extends Container {
-  private _card: Card;
   private _cardContainer!: Container; // Container for the card
-  private _statText: Text | undefined; // Stat text reference
+  private _skillContainer!: Container; // Container for the skill text area
+  private _card: Card;
+  private _cover!: Sprite; // Cover image path
+  private _skillText!: Text; // Skill text reference
+  private _statText!: Text; // Stat text reference
+  private _attackType!: Sprite; // Attack type icon
 
   constructor(card: Card) {
     super();
@@ -22,9 +26,9 @@ export class CardView extends Container {
   }
 
   private drawCard() {
-    let skillContainer = new Container();
-    skillContainer.label = "SkillContainer";
-    this.addChild(skillContainer);
+    this._skillContainer = new Container();
+    this._skillContainer.label = "SkillContainer";
+    this.addChild(this._skillContainer);
 
     const skillTextArea = new Graphics();
     skillTextArea.beginPath();
@@ -33,17 +37,17 @@ export class CardView extends Container {
     skillTextArea.fill({ color: 0x000000, alpha: 0.5 });
     skillTextArea.closePath();
     skillTextArea.label = "SkillTextArea";
-    skillContainer.addChild(skillTextArea);
+    this._skillContainer.addChild(skillTextArea);
 
-    let skillText = "No Skill";
-    const skillTextDisplay = new Text({ text: skillText, style: { fontSize: 20, fill: 0xfafafa } });
-    skillTextDisplay.anchor.set(0.5);
-    skillTextDisplay.position.set(0, 260);
-    skillTextDisplay.label = "Skill";
-    skillContainer.addChild(skillTextDisplay);
+    let text = this.card.skill ? this.card.skill.name : "No Skill";
+    this._skillText = new Text({ text: text, style: { fontSize: 20, fill: 0xfafafa } });
+    this._skillText.anchor.set(0.5);
+    this._skillText.position.set(0, 260);
+    this._skillText.label = "Skill";
+    this._skillContainer.addChild(this._skillText);
 
     // Create a container for the card
-    this._cardContainer = new Container({label: "CardContainer"});
+    this._cardContainer = new Container({ label: "CardContainer" });
     this.addChild(this._cardContainer);
 
     const mask = new Graphics();
@@ -55,12 +59,12 @@ export class CardView extends Container {
     this._cardContainer.addChild(mask);
     this._cardContainer.mask = mask;
 
-    const sprite = Sprite.from(this._card.cover);
-    sprite.anchor.set(0.5, 1);
-    sprite.scale.set(1);
-    sprite.position.set(0, 245);
-    sprite.label = "Cover";
-    this._cardContainer.addChild(sprite);
+    this._cover = Sprite.from(this._card.cover);
+    this._cover.anchor.set(0.5, 1);
+    this._cover.scale.set(1);
+    this._cover.position.set(0, 245);
+    this._cover.label = "Cover";
+    this._cardContainer.addChild(this._cover);
 
     const background = new Graphics();
     background.beginPath();
@@ -91,12 +95,12 @@ export class CardView extends Container {
     }
 
     if (attackTypeIcon) {
-      const attackTypeSprite = Sprite.from(attackTypeIcon);
-      attackTypeSprite.anchor.set(0.5, 0.5);
-      attackTypeSprite.scale.set(1);
-      attackTypeSprite.position.set(-90, 207);
-      attackTypeSprite.label = "AttackTypeIcon";
-      this._cardContainer.addChild(attackTypeSprite);
+      this._attackType = Sprite.from(attackTypeIcon);
+      this._attackType.anchor.set(0.5, 0.5);
+      this._attackType.scale.set(1);
+      this._attackType.position.set(-90, 207);
+      this._attackType.label = "AttackTypeIcon";
+      this._cardContainer.addChild(this._attackType);
     }
 
     let classTypeIcon: string = "";
@@ -140,27 +144,55 @@ export class CardView extends Container {
       this.addChild(crown);
     }
 
-    this.update();
+    this.updateStats();
   }
 
   // Update method to refresh stats
-  public update() {
+  public updateStats() {
     if (this._statText) {
-      this._statText.destroy(); // Remove old stat text
+      this._statText.destroy();
     }
-    // Special display for warrior with rage bonus
+
+    // Stats text güncelleme
     let attackText = `A: ${this._card.attack}`;
     if (this._card.classType === ClassType.Warrior && this._card.WarriorRageActivated) {
-      // Calculate the original attack value (before rage bonus)
       const originalAttack = Math.floor(this._card.attack / 1.5);
       const bonus = this._card.attack - originalAttack;
       attackText = `A: ${originalAttack} + (${bonus})`;
     }
 
-    this._statText = new Text({ text: `${attackText} H: ${this._card.health}`, style: { fontSize: 20, fill: 0xfafafa } });
+    this._statText = new Text({
+      text: `${attackText} H: ${this._card.health}`,
+      style: { fontSize: 20, fill: 0xfafafa }
+    });
     this._statText.anchor.set(0.5);
     this._statText.position.set(0, 220);
     this._statText.label = "Stats";
     this._cardContainer.addChild(this._statText);
+  }
+
+  public async updateCover() {
+    const targetCover = this._card.effectCover || this._card.cover;
+
+    if (targetCover) {
+      const newTexturePath = `assets/character/${targetCover.toLowerCase()}.png`;
+
+      // Önce cache'den kontrol et
+      let texture = Assets.cache.get(newTexturePath);
+
+      if (!texture) {
+        // Cache'de yoksa yükle
+        texture = await Assets.load(newTexturePath);
+      }
+
+      this._cover.texture = texture;
+    }
+  }
+
+  public updateAttackType(attackType: AttackType) {
+    // this._card.attackType = attackType;
+    // if (this._attackType) {
+    //   this._attackType.texture = Sprite.from(Environment[attackType]).texture;
+    // }
   }
 }

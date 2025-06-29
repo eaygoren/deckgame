@@ -12,4 +12,5 @@ export const BroadcastEvents = {
     ADD_NEW_CARDS: "addnewcards",
     NEW_CARDS_ADDED: "newcardsadded",
     CARDS_REMOVED: "cardsremoved",
+    UPDATE_CARD_AFTER_SKILL: "UPDATE_CARD_AFTER_SKILL"
 };

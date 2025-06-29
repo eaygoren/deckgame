@@ -3,6 +3,7 @@ import { CharacterList } from "../shared/constants/characters";
 import { BroadcastEvents } from "../shared/constants/events";
 import { AttackType, ClassType } from "../shared/enums";
 import { CombatOption } from "../shared/interfaces";
+import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { CardView } from "../ui/CardView";
 import { Broadcast } from "../utils/Broadcast";
 import { gsap } from "gsap";
@@ -29,7 +30,7 @@ export class CombatManager {
         this._broadcast.on(BroadcastEvents.CHECK_WARRIOR_RAGE, this.handleWarriorAbility.bind(this));
         this._broadcast.on(BroadcastEvents.CHECK_ARCANE_BLAST, this.handleMageAbility.bind(this));
     }
-    
+
     // Helper function to get initial health from character data
     private getInitialHealth = (card: Card): number => {
         const characterData = Object.values(CharacterList).find(char =>
@@ -109,7 +110,7 @@ export class CombatManager {
                             color: 0xff4444,
                         };
                         this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, abilityMessage);
-                        cardView.update();
+                        cardView.updateStats();
                     }
                 }
             }
@@ -135,7 +136,7 @@ export class CombatManager {
             //console.log(`${attacker.Name}'s Arcane Blast hits ${randomTarget.Name} for ${mageDamage} damage!`); // Find the target's view and show ability message and damage
 
             const targetView = opponentCardViews.find(view => view.card.Id === randomTarget.Id);
-            
+
             if (targetView && !targetView.destroyed && targetView.parent) {
                 this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
                     x: targetView.x,
@@ -168,8 +169,9 @@ export class CombatManager {
         const critChance = Math.random();
 
         // Critical Strike: 25% chance to deal double damage
-        if (critChance <= 0.25) {
+        if (critChance <= 0.95) {
             //console.log(`${attacker.card.Name} landed a critical strike!`);
+            const critDamage = Math.floor(attacker.card.attack * 2);
 
             if (attacker && !attacker.destroyed && attacker.parent) {
                 this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
@@ -178,12 +180,11 @@ export class CombatManager {
                     message: "Critical Strike!",
                     color: 0xff0000
                 });
-            } else {
-                //console.log("Cannot show the message!");
             }
 
-            return Math.floor(attacker.card.attack * 2);
+            return critDamage;
         }
+
         return attacker.card.attack;
     }
 
@@ -204,54 +205,188 @@ export class CombatManager {
     }
 
     public completePlayerCombat(data: CombatOption) {
-        const { attacker, defender, attackDamage, counterDamage } = data;
+        const { attacker, defender } = data;
+        let { attackDamage, counterDamage } = data;
 
-        // Hasar uygula
+        // Skill Context oluştur
+        const context: CombatContext = {
+            attacker: attacker.card,
+            defender: defender.card,
+            damage: attackDamage,
+            isCounterAttack: false,
+            allPlayerCards: [], // Game.ts'den gelecek
+            allBotCards: []     // Game.ts'den gelecek
+        };
+
+        // 1. Before Attack Skills (Joker, Illusionist gibi)
+        const hasBeforeAttackSkill = context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack;
+        this.triggerBeforeAttackSkills(context);
+
+        if (hasBeforeAttackSkill) {
+            const newDamage = this.calculateAttackDamage(attacker, defender);
+            attackDamage = newDamage;
+            context.damage = newDamage;
+
+            counterDamage = this.calculateCounterDamage(defender.card);
+            data.counterDamage = counterDamage;
+        }
+
+        // 2. Dodge kontrolü (Aerwyn gibi)
+        if (this.checkDodge(defender.card)) {
+            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                x: defender.x,
+                y: defender.y,
+                message: `${defender.card.name} dodged!`,
+                color: 0x00ff00
+            });
+            return; // Saldırı kaçırıldı
+        }
+
+        // 3. Hasar uygula
         defender.card.health = Math.max(0, defender.card.health - attackDamage);
 
-        if (attacker.card.attackType === AttackType.Melee) {
+        // 4. After Attack Skills (Zombie, Dragon, Vampire gibi)
+        this.triggerAfterAttackSkills(context);
+
+        // 5. Damage Received Skills (Alien gibi)
+        this.triggerDamageReceivedSkills(context);
+
+        // 6. Counter Attack (eğer engellenmediyse)
+        if (attacker.card.attackType === AttackType.Melee && !attacker.card.hasEffect?.(EffectType.Invisible)) {
             attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
         }
 
+        // UI güncellemeleri
         if (attacker && !attacker.destroyed) {
-            attacker.update();
-            // Scale'i sıfırla
+            attacker.updateStats();
             gsap.to(attacker.scale, { x: 1, y: 1, duration: 0.2 });
         }
 
         if (defender && !defender.destroyed) {
-            defender.update();
-            // Scale'i sıfırla
+            defender.updateStats();
             gsap.to(defender.scale, { x: 1, y: 1, duration: 0.2 });
         }
 
-        // Ölü kartları kaldır (animasyonla)
         this._broadcast.emit(BroadcastEvents.PLAYER_COMBAT_COMPLETED, data);
     }
 
     public completeBotCombat(data: CombatOption) {
-        const { attacker, defender, attackDamage, counterDamage } = data;
+        const { attacker, defender } = data;
+        let { attackDamage, counterDamage } = data;
 
-        // Hasar uygula
+        // Skill Context oluştur
+        const context: CombatContext = {
+            attacker: attacker.card,
+            defender: defender.card,
+            damage: attackDamage,
+            isCounterAttack: false,
+            allPlayerCards: [], // Game.ts'den gelecek
+            allBotCards: []     // Game.ts'den gelecek
+        };
+
+        // 1. Before Attack Skills
+        const hasBeforeAttackSkill = context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack;
+        this.triggerBeforeAttackSkills(context);
+
+        if (hasBeforeAttackSkill) {
+            const newDamage = this.calculateAttackDamage(attacker, defender);
+            attackDamage = newDamage;
+            context.damage = newDamage;
+
+            counterDamage = this.calculateCounterDamage(defender.card);
+            data.counterDamage = counterDamage;
+        }
+
+        // 2. Dodge kontrolü
+        if (this.checkDodge(defender.card)) {
+            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                x: defender.x,
+                y: defender.y,
+                message: `${defender.card.name} dodged!`,
+                color: 0x00ff00
+            });
+            return;
+        }
+
+        // 3. Hasar uygula
         defender.card.health = Math.max(0, defender.card.health - attackDamage);
 
-        if (attacker.card.attackType === AttackType.Melee) {
+        // 4. After Attack Skills
+        this.triggerAfterAttackSkills(context);
+
+        // 5. Damage Received Skills
+        this.triggerDamageReceivedSkills(context);
+
+        // 6. Counter Attack
+        if (attacker.card.attackType === AttackType.Melee &&
+            !defender.card.hasEffect?.(EffectType.Invisible)) {
+
+            console.log(counterDamage);
             attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
         }
 
-        // Stats güncelle - null check
+        // UI güncellemeleri
         if (attacker && !attacker.destroyed) {
-            attacker.update();
-            // Scale'i sıfırla
+            attacker.updateStats();
             gsap.to(attacker.scale, { x: 1, y: 1, duration: 0.2 });
         }
 
         if (defender && !defender.destroyed) {
-            defender.update();
-            // Scale'i sıfırla
+            defender.updateStats();
             gsap.to(defender.scale, { x: 1, y: 1, duration: 0.2 });
         }
 
         this._broadcast.emit(BroadcastEvents.BOT_COMBAT_COMPLETED, data);
+    }
+
+    // Skill trigger metodları
+    private triggerBeforeAttackSkills(context: CombatContext): void {
+        if (context.defender && context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) {
+            const result = context.attacker.useSkill?.(context.defender, context);
+            if (result?.success && result.message) {
+                this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                    message: result.message,
+                    color: "#9932cc"
+                });
+            }
+        }
+    }
+
+    private triggerAfterAttackSkills(context: CombatContext): void {
+        if (context.defender && context.attacker.skill?.triggerTiming === SkillTiming.AfterAttack) {
+            const result = context.attacker.useSkill?.(context.defender, context);
+            if (result?.success) {
+                if (result.message) {
+                    this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                        message: result.message,
+                        color: "#ff6600"
+                    });
+                }
+
+                // CardView'ı hemen güncelle
+                this._broadcast.emit(BroadcastEvents.UPDATE_CARD_AFTER_SKILL, {
+                    targetCard: context.defender
+                });
+            }
+        }
+    }
+
+    private triggerDamageReceivedSkills(context: CombatContext): void {
+        if (context.defender && context.defender.skill?.triggerTiming === SkillTiming.OnDamageReceived) {
+            const result = context.defender.useSkill?.(context.attacker, context);
+            if (result?.success && result.message) {
+                this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                    message: result.message,
+                    color: "#9932cc"
+                });
+            }
+        }
+    }
+
+    private checkDodge(defender: Card): boolean {
+        if (defender.hasEffect?.(EffectType.Dodge)) {
+            return Math.random() < 0.25; // %25 şans
+        }
+        return false;
     }
 }
