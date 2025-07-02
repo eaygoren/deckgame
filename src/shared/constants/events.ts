@@ -7,10 +7,9 @@ export const BroadcastEvents = {
     RESET_INTERACTION: "restartgame",
     SHOW_ABILITY_MESSAGE: "showabilitymessage",
     SHOW_DAMAGE_ANIMATION: "showdamageanimation",
-    CHECK_WARRIOR_RAGE: "checkwarriorrage",
     CHECK_ARCANE_BLAST: "checkarcaneblast",
     ADD_NEW_CARDS: "addnewcards",
     NEW_CARDS_ADDED: "newcardsadded",
     CARDS_REMOVED: "cardsremoved",
-    UPDATE_CARD_AFTER_SKILL: "UPDATE_CARD_AFTER_SKILL"
+    TURN_COMPLETED: "turncompleted"
 };

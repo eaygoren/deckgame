@@ -1,6 +1,6 @@
 import { Assets } from "pixi.js";
 import { Characters } from "../shared/constants/characters";
-import { Environment } from "../shared/constants/gameConfig";
+import { Effects, Environment } from "../shared/constants/gameConfig";
 
 export class AssetLoader {
   public static async loadAll(): Promise<void> {
@@ -14,7 +14,13 @@ export class AssetLoader {
       src: `assets/environment/${alias}.png`
     }));
 
+    const effects = Object.values(Effects).map((alias) => ({
+      alias,
+      src: `assets/effects/${alias}.png`
+    }));
+
     await Assets.load(chars);
     await Assets.load(env);
+    await Assets.load(effects);
   }
 }

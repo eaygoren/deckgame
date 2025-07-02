@@ -70,7 +70,7 @@ export class GenericSkill extends BaseSkill {
             case EffectType.Heal:
                 return this.applyHeal(actualTarget, effectConfig, context);
             case EffectType.LifeSteal:
-                return this.applyLifeSteal(caster, effectConfig, context); // LifeSteal her zaman caster'a
+                return this.applyLifeSteal(caster, effectConfig, context);
             case EffectType.Burn:
                 return this.applyBurn(actualTarget, effectConfig);
             case EffectType.AttackReduction:
@@ -139,8 +139,7 @@ export class GenericSkill extends BaseSkill {
         const effect: SkillEffect = {
             type: EffectType.Zombify,
             target: target,
-            duration: config.duration || 1,
-            coverChange: config.coverChange // SkillFactory'den gelen cover
+            duration: config.duration || 1
         };
 
         if (target.addEffect) {
@@ -280,7 +279,6 @@ export class GenericSkill extends BaseSkill {
 
     private applyAttackCopy(caster: Card, target?: Card, config?: any): SkillResult {
         if (!target || target.attack === undefined || caster.attack === undefined) {
-            console.log(`🃏 Attack copy failed - missing data`);
             return { success: false };
         }
 
@@ -293,7 +291,6 @@ export class GenericSkill extends BaseSkill {
             };
         }
 
-        console.log(`🃏 No copy needed - target attack (${target.attack}) not higher than caster (${caster.attack})`);
         return { success: false };
     }
 

@@ -6,7 +6,6 @@ import { CombatOption } from "../shared/interfaces";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { CardView } from "../ui/CardView";
 import { Broadcast } from "../utils/Broadcast";
-import { gsap } from "gsap";
 
 export class CombatManager {
     private static instance: CombatManager;
@@ -25,10 +24,68 @@ export class CombatManager {
     }
 
     private eventListeners() {
-        this._broadcast.on(BroadcastEvents.COMPLETE_PLAYER_COMBAT, this.completePlayerCombat.bind(this));
-        this._broadcast.on(BroadcastEvents.COMPLETE_BOT_COMBAT, this.completeBotCombat.bind(this));
-        this._broadcast.on(BroadcastEvents.CHECK_WARRIOR_RAGE, this.handleWarriorAbility.bind(this));
         this._broadcast.on(BroadcastEvents.CHECK_ARCANE_BLAST, this.handleMageAbility.bind(this));
+    }
+
+    public async resolveCombat(attacker: CardView, defender: CardView): Promise<CombatOption> {
+        // 1. İlk damage hesaplama
+        const initialAttackDamage = this.calculateAttackDamage(attacker, defender);
+        const initialCounterDamage = this.calculateCounterDamage(defender.card);
+
+        const combatData: CombatOption = {
+            attacker,
+            defender,
+            attackDamage: initialAttackDamage,
+            counterDamage: initialCounterDamage
+        };
+
+        // 2. Context oluştur
+        const context: CombatContext = {
+            attacker: attacker.card,
+            defender: defender.card,
+            damage: initialAttackDamage,
+            isCounterAttack: false,
+            allPlayerCards: [],
+            allBotCards: []
+        };
+
+        // 3. BeforeAttack Skills (Joker, Illusionist)
+        if (context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) {
+            this.triggerBeforeAttackSkills(context);
+
+            // 4. Skill sonrası damage yeniden hesapla
+            const newAttackDamage = this.calculateAttackDamage(attacker, defender);
+            const newCounterDamage = this.calculateCounterDamage(defender.card);
+
+            combatData.attackDamage = newAttackDamage;
+            combatData.counterDamage = newCounterDamage;
+            context.damage = newAttackDamage;
+
+            // 5. Stats'ları hemen güncelle
+            attacker.updateStats();
+        }
+
+        // 6. Hasarları uygula (health'ler değişsin ama animation öncesi)
+        this.applyDamageToCards(combatData);
+
+        // 7. AfterAttack skills
+        this.triggerAfterAttackSkills(context);
+        this.triggerDamageReceivedSkills(context);
+
+        return combatData;
+    }
+
+    private applyDamageToCards(combatData: CombatOption): void {
+        const { attacker, defender, attackDamage, counterDamage } = combatData;
+
+        // Ana hasar
+        defender.card.health = Math.max(0, defender.card.health - attackDamage);
+
+        // Counter hasar
+        if (attacker.card.attackType === AttackType.Melee &&
+            !attacker.card.hasEffect?.(EffectType.Invisible)) {
+            attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
+        }
     }
 
     // Helper function to get initial health from character data
@@ -79,14 +136,14 @@ export class CombatManager {
         return attacker.card.attack; // Default to attack value if no special ability applies
     }
 
-    private handleWarriorAbility(data: { playerCardViews: CardView[], botCardViews: CardView[] }): void {
+    public handleWarriorAbility(playerCardViews: CardView[], botCardViews: CardView[]): void {
         // Null/undefined kontrolü
-        if (!data || !data.playerCardViews || !data.botCardViews) {
+        if (!playerCardViews || !botCardViews) {
             //console.warn("handleWarriorAbility: Invalid data received", data);
             return;
         }
 
-        const allCardViews = [...data.playerCardViews, ...data.botCardViews];
+        const allCardViews = [...playerCardViews, ...botCardViews];
         for (const cardView of allCardViews) {
             const card = cardView?.card;
             if (!card) continue;
@@ -204,141 +261,6 @@ export class CombatManager {
         return Math.floor(attacker.card.attack * 0.5);
     }
 
-    public completePlayerCombat(data: CombatOption) {
-        const { attacker, defender } = data;
-        let { attackDamage, counterDamage } = data;
-
-        // Skill Context oluştur
-        const context: CombatContext = {
-            attacker: attacker.card,
-            defender: defender.card,
-            damage: attackDamage,
-            isCounterAttack: false,
-            allPlayerCards: [], // Game.ts'den gelecek
-            allBotCards: []     // Game.ts'den gelecek
-        };
-
-        // 1. Before Attack Skills (Joker, Illusionist gibi)
-        const hasBeforeAttackSkill = context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack;
-        this.triggerBeforeAttackSkills(context);
-
-        if (hasBeforeAttackSkill) {
-            const newDamage = this.calculateAttackDamage(attacker, defender);
-            attackDamage = newDamage;
-            context.damage = newDamage;
-
-            counterDamage = this.calculateCounterDamage(defender.card);
-            data.counterDamage = counterDamage;
-        }
-
-        // 2. Dodge kontrolü (Aerwyn gibi)
-        if (this.checkDodge(defender.card)) {
-            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-                x: defender.x,
-                y: defender.y,
-                message: `${defender.card.name} dodged!`,
-                color: 0x00ff00
-            });
-            return; // Saldırı kaçırıldı
-        }
-
-        // 3. Hasar uygula
-        defender.card.health = Math.max(0, defender.card.health - attackDamage);
-
-        // 4. After Attack Skills (Zombie, Dragon, Vampire gibi)
-        this.triggerAfterAttackSkills(context);
-
-        // 5. Damage Received Skills (Alien gibi)
-        this.triggerDamageReceivedSkills(context);
-
-        // 6. Counter Attack (eğer engellenmediyse)
-        if (attacker.card.attackType === AttackType.Melee && !attacker.card.hasEffect?.(EffectType.Invisible)) {
-            attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
-        }
-
-        // UI güncellemeleri
-        if (attacker && !attacker.destroyed) {
-            attacker.updateStats();
-            gsap.to(attacker.scale, { x: 1, y: 1, duration: 0.2 });
-        }
-
-        if (defender && !defender.destroyed) {
-            defender.updateStats();
-            gsap.to(defender.scale, { x: 1, y: 1, duration: 0.2 });
-        }
-
-        this._broadcast.emit(BroadcastEvents.PLAYER_COMBAT_COMPLETED, data);
-    }
-
-    public completeBotCombat(data: CombatOption) {
-        const { attacker, defender } = data;
-        let { attackDamage, counterDamage } = data;
-
-        // Skill Context oluştur
-        const context: CombatContext = {
-            attacker: attacker.card,
-            defender: defender.card,
-            damage: attackDamage,
-            isCounterAttack: false,
-            allPlayerCards: [], // Game.ts'den gelecek
-            allBotCards: []     // Game.ts'den gelecek
-        };
-
-        // 1. Before Attack Skills
-        const hasBeforeAttackSkill = context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack;
-        this.triggerBeforeAttackSkills(context);
-
-        if (hasBeforeAttackSkill) {
-            const newDamage = this.calculateAttackDamage(attacker, defender);
-            attackDamage = newDamage;
-            context.damage = newDamage;
-
-            counterDamage = this.calculateCounterDamage(defender.card);
-            data.counterDamage = counterDamage;
-        }
-
-        // 2. Dodge kontrolü
-        if (this.checkDodge(defender.card)) {
-            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-                x: defender.x,
-                y: defender.y,
-                message: `${defender.card.name} dodged!`,
-                color: 0x00ff00
-            });
-            return;
-        }
-
-        // 3. Hasar uygula
-        defender.card.health = Math.max(0, defender.card.health - attackDamage);
-
-        // 4. After Attack Skills
-        this.triggerAfterAttackSkills(context);
-
-        // 5. Damage Received Skills
-        this.triggerDamageReceivedSkills(context);
-
-        // 6. Counter Attack
-        if (attacker.card.attackType === AttackType.Melee &&
-            !defender.card.hasEffect?.(EffectType.Invisible)) {
-
-            console.log(counterDamage);
-            attacker.card.health = Math.max(0, attacker.card.health - counterDamage);
-        }
-
-        // UI güncellemeleri
-        if (attacker && !attacker.destroyed) {
-            attacker.updateStats();
-            gsap.to(attacker.scale, { x: 1, y: 1, duration: 0.2 });
-        }
-
-        if (defender && !defender.destroyed) {
-            defender.updateStats();
-            gsap.to(defender.scale, { x: 1, y: 1, duration: 0.2 });
-        }
-
-        this._broadcast.emit(BroadcastEvents.BOT_COMBAT_COMPLETED, data);
-    }
-
     // Skill trigger metodları
     private triggerBeforeAttackSkills(context: CombatContext): void {
         if (context.defender && context.attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) {
@@ -362,11 +284,6 @@ export class CombatManager {
                         color: "#ff6600"
                     });
                 }
-
-                // CardView'ı hemen güncelle
-                this._broadcast.emit(BroadcastEvents.UPDATE_CARD_AFTER_SKILL, {
-                    targetCard: context.defender
-                });
             }
         }
     }
@@ -383,10 +300,10 @@ export class CombatManager {
         }
     }
 
-    private checkDodge(defender: Card): boolean {
-        if (defender.hasEffect?.(EffectType.Dodge)) {
-            return Math.random() < 0.25; // %25 şans
-        }
-        return false;
-    }
+    // private checkDodge(defender: Card): boolean {
+    //     if (defender.hasEffect?.(EffectType.Dodge)) {
+    //         return Math.random() < 0.25; // %25 şans
+    //     }
+    //     return false;
+    // }
 }

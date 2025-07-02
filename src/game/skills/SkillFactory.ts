@@ -1,4 +1,3 @@
-import { Characters } from "../../shared/constants/characters";
 import { EffectType, SkillConfig, SkillTiming, Target } from "../../shared/interfaces/skillInterfaces";
 import { BaseSkill } from "./BaseSkill";
 import { GenericSkill } from "./GenericSkill";
@@ -111,7 +110,7 @@ export class SkillFactory {
         // Knight - takım arkadaşını korur
         ['knight', {
             name: "Guardian Shield",
-            description: "Protects an ally at turn start, shares damage 50/50",
+            description: "Protects an random ally at turn start, shares damage 50/50",
             triggerTiming: SkillTiming.StartOfTurn,
             effects: [
                 { type: EffectType.Protection, target: Target.RandomAlly, value: 0.5 }
@@ -172,13 +171,7 @@ export class SkillFactory {
             description: "Turns enemy into zombie for 1 turn, silences skills",
             triggerTiming: SkillTiming.AfterAttack,
             effects: [
-                {
-                    type: EffectType.Zombify,
-                    target: Target.Enemy,
-                    duration: 1,
-                    coverChange: Characters.Zombie.toLowerCase()
-                },
-                { type: EffectType.Silence, target: Target.Enemy, duration: 1 }
+                { type: EffectType.Zombify, target: Target.Enemy, duration: 1 }
             ]
         }]
     ]);

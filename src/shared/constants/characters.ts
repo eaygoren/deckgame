@@ -17,7 +17,7 @@ export const Characters = {
     Illusionist: "Illusionist", // oyun başına bir kez olmak üzere, rakibin canı ile saldırı gücünü değiştirir
     Joker: "Joker", // saldırdığı rakibin hasarı kendi hasarından yüksekse, rakibin hasarını kendi hasarına eşitler
     Knight: "Knight", // tur başında 1 takım arkadaşını korur, koruduğu kart hasarın yarısını alır ve hasarın diğer yarısını kendisi alır
-    Lich: "Lich", // rakibi 1 tur dondurur, donan kart bir 1 tur saldırı yapamaz
+    Lich: "Lich", // rakibi 1 tur dondurur, donan kart bir 1 tur saldırı ve counter saldırı yapamaz, passive skill kullanılabilir
     // Medusa: "Medusa",
     // Minotaur: "Minotaur",
     Monk: "Monk",
@@ -36,7 +36,7 @@ export const Characters = {
     // Witch: "Witch",
     Wukong: "Wukong",
     Zeus: "Zeus",
-    Zombie: "Zombie" //rakibi 1 tur zombie yapar, zombie olan kart 1 tur boyunca skill kullanamaz
+    Zombie: "Zombie" //rakibi 1 tur zombie yapar, zombie olan kart 1 tur boyunca ability kullanamaz
 };
 
 export const CharacterList = {

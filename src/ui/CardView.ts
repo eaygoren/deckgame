@@ -1,13 +1,15 @@
-import { Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
+import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import { Card, LeaderCard } from "../game/Card";
 import { AttackType, ClassType, Color } from "../shared/enums";
-import { Environment } from "../shared/constants/gameConfig";
+import { EFFECT_FILTERS, Environment } from "../shared/constants/gameConfig";
+import { AdjustmentFilter } from "pixi-filters";
 
 export class CardView extends Container {
   private _cardContainer!: Container; // Container for the card
   private _skillContainer!: Container; // Container for the skill text area
   private _card: Card;
   private _cover!: Sprite; // Cover image path
+  private _effectCover!: Sprite; // Effect image path
   private _skillText!: Text; // Skill text reference
   private _statText!: Text; // Stat text reference
   private _attackType!: Sprite; // Attack type icon
@@ -65,6 +67,14 @@ export class CardView extends Container {
     this._cover.position.set(0, 245);
     this._cover.label = "Cover";
     this._cardContainer.addChild(this._cover);
+
+    this._effectCover = Sprite.from(Texture.EMPTY);
+    this._effectCover.anchor.set(0.5, 0.5);
+    this._effectCover.scale.set(1);
+    this._effectCover.position.set(0, 50);
+    this._effectCover.label = "EffectCover";
+    this._effectCover.visible = false; // Initially hidden
+    this._cardContainer.addChild(this._effectCover);
 
     const background = new Graphics();
     background.beginPath();
@@ -172,27 +182,33 @@ export class CardView extends Container {
   }
 
   public async updateCover() {
-    const targetCover = this._card.effectCover || this._card.cover;
+    if (this._card.activeEffects && this._card.activeEffects.length > 0) {
+      for (const activeEffect of this._card.activeEffects) {
+        const effectType = activeEffect.type;
+        
+        if (effectType && this._card.effectCover) {
+          this._effectCover.texture = Texture.from(this._card.effectCover);
+          this._effectCover.visible = true;
+        }
 
-    if (targetCover) {
-      const newTexturePath = `assets/character/${targetCover.toLowerCase()}.png`;
-
-      // Önce cache'den kontrol et
-      let texture = Assets.cache.get(newTexturePath);
-
-      if (!texture) {
-        // Cache'de yoksa yükle
-        texture = await Assets.load(newTexturePath);
+        // Filter uygula (her effect için)
+        const filterConfig = effectType && effectType in EFFECT_FILTERS
+          ? EFFECT_FILTERS[effectType as keyof typeof EFFECT_FILTERS]
+          : null;
+        this._cover.filters = filterConfig ? [new AdjustmentFilter(filterConfig)] : [];
       }
-
-      this._cover.texture = texture;
+    }else{
+      this._effectCover.texture = Texture.EMPTY;
+      this._effectCover.visible = false;
+      this._cover.filters = [];
     }
+    
   }
 
-  public updateAttackType(attackType: AttackType) {
-    // this._card.attackType = attackType;
-    // if (this._attackType) {
-    //   this._attackType.texture = Sprite.from(Environment[attackType]).texture;
-    // }
-  }
+  // public updateAttackType(attackType: AttackType) {
+  //   this._card.attackType = attackType;
+  //   if (this._attackType) {
+  //     this._attackType.texture = Sprite.from(Environment[attackType]).texture;
+  //   }
+  // }
 }

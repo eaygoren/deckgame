@@ -1,4 +1,4 @@
-import { Environment } from "../shared/constants/gameConfig";
+import { Effects, Environment } from "../shared/constants/gameConfig";
 import { Color, Rarity, AttackType, ClassType } from "../shared/enums";
 import { IAbility, ICard, ILeaderCard } from "../shared/interfaces";
 import { CombatContext, EffectType, ISkill, SkillEffect, SkillResult } from "../shared/interfaces/skillInterfaces";
@@ -23,7 +23,7 @@ export class Card implements ICard {
   protected _maxHealth: number; // Başlangıç canını saklamak için
   protected _effectCover?: string;
   protected _warriorRageActivated: boolean = false;
-  
+
   constructor(options: ICard) {
     this._id = Card.nextId++;
     this._name = options.name;
@@ -62,20 +62,28 @@ export class Card implements ICard {
     this.removeEffect(effect.type);
     this._activeEffects.push(effect);
 
-    // Generic cover değişikliği
-    if (effect.coverChange) {
-      this._effectCover = effect.coverChange;
-    }
+    switch (effect.type) {
+      case EffectType.Bleed:
+        this._effectCover = Effects.bleed;
+        break;
+      case EffectType.Burn:
+        this._effectCover = Effects.burn;
+        break;
+      case EffectType.Freeze:
+        this._effectCover = Effects.freeze;
+        break;
+      case EffectType.Zombify:
+        this._effectCover = Effects.zombify;
+        break;
+      case EffectType.AttackReduction:
+        if (!this._maxAttack) {
+          this._maxAttack = this._attack;
+        }
 
-    // Attack reduction için original attack'ı sakla
-    if (effect.type === EffectType.AttackReduction) {
-      if (!this._maxAttack) {
-        this._maxAttack = this._attack;
-      }
-
-      // Attack'ı azalt
-      const reductionAmount = Math.floor(this._attack * (effect.value || 0.5));
-      this._attack = Math.max(1, this._attack - reductionAmount);
+        // Attack'ı azalt
+        const reductionAmount = Math.floor(this._attack * (effect.value || 0.5));
+        this._attack = Math.max(1, this._attack - reductionAmount);
+        break;
     }
   }
 
@@ -93,8 +101,23 @@ export class Card implements ICard {
 
       // Effect bittiğinde temizlik yap
       if (effect.duration <= 0) {
-        if (effect.coverChange) {
-          this._effectCover = undefined;
+        switch (effect.type) {
+          case EffectType.Bleed:
+            this.removeEffect(EffectType.Bleed);
+            this._effectCover = undefined;
+            break;
+          case EffectType.Burn:
+            this.removeEffect(EffectType.Burn);
+            this._effectCover = undefined;
+            break;
+          case EffectType.Freeze:
+            this.removeEffect(EffectType.Freeze);
+            this._effectCover = undefined;
+            break;
+          case EffectType.Zombify:
+            this.removeEffect(EffectType.Zombify);
+            this._effectCover = undefined;
+            break;
         }
 
         // Attack reduction bittiğinde attack'ı restore et
@@ -212,11 +235,6 @@ export class Card implements ICard {
 
   public set WarriorRageActivated(value: boolean) {
     this._warriorRageActivated = value;
-  }
-
-  public get currentCover(): string {
-    // Eğer effectCover varsa onu kullan, yoksa normal cover'ı döndür
-    return this._effectCover || this._cover;
   }
 }
 

@@ -117,8 +117,8 @@ export class AnimationManager {
 
         // Ability mesaj animasyonu
         gsap.timeline()
-            .to(abilityText, { y: abilityText.y - 30, alpha: 0.8, duration: 0.3 })
-            .to(abilityText, { alpha: 0, duration: 0.7 }, "-=0.3")
+            .to(abilityText, { y: abilityText.y - 30, alpha: 0.8, duration: 0.5 })
+            .to(abilityText, { alpha: 0, duration: 0.5 }, "-=0.3")
             .call(() => {
                 this._battlefield.battleLog.removeChild(abilityText);
             });
@@ -137,7 +137,7 @@ export class AnimationManager {
 
         // Null check için animasyon öncesi kontrol
         if (attacker.destroyed || defender.destroyed || !attacker.parent || !defender.parent) {
-            this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+            this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
             return;
         }
 
@@ -152,7 +152,7 @@ export class AnimationManager {
                 this.showDamageAnimation({ targetView: defender, damage: attackDamage }).then(() => {
                     // Animasyon sırasında obje silinmiş olabilir
                     if (!attacker || attacker.destroyed || !attacker.parent) {
-                        this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+                        this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                         return;
                     }
 
@@ -166,10 +166,10 @@ export class AnimationManager {
                             // 4. Counter damage (sadece melee için)
                             if (attacker.card.attackType === AttackType.Melee && counterDamage > 0) {
                                 this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
-                                    this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+                                    this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                                 });
                             } else {
-                                this._broadcast.emit(BroadcastEvents.COMPLETE_PLAYER_COMBAT, data);
+                                this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                             }
                         }
                     });
@@ -195,7 +195,7 @@ export class AnimationManager {
 
         // Null check için animasyon öncesi kontrol
         if (attacker.destroyed || defender.destroyed || !attacker.parent || !defender.parent) {
-            this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+            this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
             return;
         }
 
@@ -208,7 +208,7 @@ export class AnimationManager {
                 this.showDamageAnimation({ targetView: defender, damage: attackDamage }).then(() => {
                     // Animasyon sırasında obje silinmiş olabilir
                     if (!attacker || attacker.destroyed || !attacker.parent) {
-                        this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+                        this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                         return;
                     }
 
@@ -220,10 +220,10 @@ export class AnimationManager {
                         onComplete: () => {
                             if (attacker.card.attackType === AttackType.Melee && counterDamage > 0) {
                                 this.showDamageAnimation({ targetView: attacker, damage: counterDamage }).then(() => {
-                                    this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+                                    this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                                 });
                             } else {
-                                this._broadcast.emit(BroadcastEvents.COMPLETE_BOT_COMBAT, data);
+                                this._broadcast.emit(BroadcastEvents.TURN_COMPLETED);
                             }
                         }
                     });

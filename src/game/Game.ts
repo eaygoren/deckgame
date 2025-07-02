@@ -4,7 +4,7 @@ import { Deck } from "./Deck";
 import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
-import { MoveOption, CombatOption } from "../shared/interfaces";
+import { MoveOption } from "../shared/interfaces";
 import { AttackType, ClassType, Turn } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
@@ -47,7 +47,7 @@ export class Game {
     // }, 1000);
   }
 
-  private testSkillSystem(): void {
+  /*private testSkillSystem(): void {
     console.log("=== SKILL SYSTEM TEST ===");
 
     console.log("\n\n=== Player Hand ===");
@@ -73,12 +73,10 @@ export class Game {
     });
 
     console.log("\n\n=== TEST COMPLETED ===");
-  }
+  }*/
 
   private eventListeners() {
-    this._broadcast.on(BroadcastEvents.PLAYER_COMBAT_COMPLETED, this.onPlayerCombatCompleted.bind(this));
-    this._broadcast.on(BroadcastEvents.BOT_COMBAT_COMPLETED, this.onBotCombatCompleted.bind(this));
-    this._broadcast.on(BroadcastEvents.UPDATE_CARD_AFTER_SKILL, this.onUpdateCardAfterSkill.bind(this));
+    this._broadcast.on(BroadcastEvents.TURN_COMPLETED, this.onTurnCompleted.bind(this));
     this._broadcast.on(BroadcastEvents.CHECK_FOR_WINNER, this.checkForWinner.bind(this));
     this._broadcast.on(BroadcastEvents.RESET_INTERACTION, this.handleInteraction.bind(this));
     this._broadcast.on(BroadcastEvents.ADD_NEW_CARDS, this.addNewCards.bind(this));
@@ -237,24 +235,27 @@ export class Game {
       }
     }
 
-    this._defender = view; gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+    this._defender = view;
 
-    const attackDamage = this._combatManager.calculateAttackDamage(this._attacker, this._defender);
-    const counterDamage = this._combatManager.calculateCounterDamage(this._defender.card);
-
-    const combatData: CombatOption = {
-      attacker: this._attacker,
-      defender: this._defender,
-      attackDamage,
-      counterDamage
-    };
+    gsap.to(this._defender.scale, { x: 1.2, y: 1.2, duration: 0.2 });
 
     this.resolveZIndex(this._player);
 
+    this.resolvePlayerAttack(this._attacker, this._defender);
+  }
+
+  private async resolvePlayerAttack(attacker: CardView, defender: CardView) {
+    if (!attacker || !defender) return;
+
+    const combatResult = await this._combatManager.resolveCombat(attacker, defender);
+
     setTimeout(() => {
-      this._animationManager.resolvePlayerAttackWithAnimation(combatData);
-      if (combatData.attacker.card.classType === ClassType.Mage) {
-        this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: combatData.attacker, opponentCardViews: this._botCardViews });
+      if (combatResult) {
+        this._animationManager.resolvePlayerAttackWithAnimation(combatResult);
+
+        if (combatResult.attacker.card.classType === ClassType.Mage) {
+          this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: combatResult.attacker, opponentCardViews: this._botCardViews });
+        }
       }
     }, 500);
   }
@@ -293,24 +294,25 @@ export class Game {
     gsap.to(attacker.scale, { x: 1.2, y: 1.2, duration: 0.2 });
     gsap.to(defender.scale, { x: 1.2, y: 1.2, duration: 0.2 });
 
-    const attackDamage = this._combatManager.calculateAttackDamage(attacker, defender);
-    const counterDamage = this._combatManager.calculateCounterDamage(defender.card);
-
-    const combatData: CombatOption = {
-      attacker,
-      defender,
-      attackDamage,
-      counterDamage
-    };
-
     this.resolveZIndex(this._bot);
 
-    setTimeout(() => {
-      this._animationManager.resolveBotAttackWithAnimation(combatData);
-      if (attacker.card.classType === ClassType.Mage) {
-        this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: attacker, opponentCardViews: this._playerCardViews });
-      }
-    }, 500);
+    this.resolveBotAttack(attacker, defender);
+  }
+
+  private async resolveBotAttack(attacker: CardView, defender: CardView) {
+    if (!attacker || !defender) return;
+
+    const combatResult = await this._combatManager.resolveCombat(attacker, defender);
+
+    if (combatResult) {
+      setTimeout(() => {
+        this._animationManager.resolvePlayerAttackWithAnimation(combatResult);
+
+        if (combatResult.attacker.card.classType === ClassType.Mage) {
+          this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: combatResult.attacker, opponentCardViews: this._playerCardViews });
+        }
+      }, 500);
+    }
   }
 
   private calculateMoveScore(attacker: Card, defender: Card): number {
@@ -460,38 +462,11 @@ export class Game {
     };
   }
 
-  // Player turn sonu - Player'ın uyguladığı effect'ler zarar verir
-  private applyPlayerTurnEndEffects(): void {
-    // Player'ın uyguladığı effect'ler aktif olsun
-    this._bot.hand.forEach(card => {
-      this.applyEffectDamageIfOwner(card, "player", "Player turn end");
-    });
-
-    this._botCardViews.forEach(view => {
-      view.updateCover(); // Bot kartlarının güncellenmesi
-    });
-  }
-
-  // Bot turn sonu - Bot'un uyguladığı effect'ler zarar verir  
-  private applyBotTurnEndEffects(): void {
-    // Bot'un uyguladığı effect'ler aktif olsun
-    this._player.hand.forEach(card => {
-      this.applyEffectDamageIfOwner(card, "bot", "Bot turn end");
-    });
-
-    this._playerCardViews.forEach(view => {
-      view.updateCover(); // Player kartlarının güncellenmesi
-    });
-  }
-
   // Effect damage - sadece belirli owner'ın effect'leri çalışır
-  private applyEffectDamageIfOwner(card: Card, ownerType: "player" | "bot", turnInfo: string): void {
+  private async applyEffectDamageIfOwner(card: Card): Promise<void> {
     if (!card.activeEffects) return;
 
-    card.activeEffects.forEach(effect => {
-      // Effect'in owner'ını kontrol et (effect'e owner property'si eklemek gerekir)
-      // Şimdilik basit kontrol: hangi turn'daysa o effect'leri uygula
-
+    for (const effect of card.activeEffects) {
       switch (effect.type) {
         case EffectType.Bleed:
           const bleedDamage = effect.value || 1;
@@ -505,7 +480,7 @@ export class Game {
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
             x: cardView?.x,
             y: cardView?.y,
-            message: `${card.name} bleeds for ${bleedDamage} damage! (${turnInfo})`,
+            message: `${card.name} loses ${bleedDamage} health due to bleed!`,
             color: "#ff0000"
           });
           break;
@@ -521,12 +496,12 @@ export class Game {
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
             x: burnCardView?.x,
             y: burnCardView?.y,
-            message: `${card.name} burns for ${burnDamage} damage! (${turnInfo})`,
+            message: `${card.name} loses ${burnDamage} health due to burn!`,
             color: "#ff4500"
           });
           break;
       }
-    });
+    };
   }
 
   private findCardView(card: Card): CardView | null {
@@ -569,48 +544,43 @@ export class Game {
     });
   }
 
-  private onPlayerCombatCompleted() {
+  private async onTurnCompleted(): Promise<void> {
     this._attacker = null;
     this._defender = null;
 
-    this._player.hand.forEach(card => {
-      card.updateEffects();
+    this._playerCardViews.forEach(async view => {
+      view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+      view.updateStats();
+      view.updateCover();
+
+      if (this._turn === Turn.Player && view.card.activeEffects) {
+        await this.applyEffectDamageIfOwner(view.card);
+        view.card.updateEffects();
+        view.updateCover();
+      }
     });
 
-    this._broadcast.emit(BroadcastEvents.CHECK_WARRIOR_RAGE, { playerCardViews: this._playerCardViews, botCardViews: this._botCardViews });
+    this._botCardViews.forEach(async view => {
+      view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+      view.updateStats();
+      view.updateCover();
 
-    this.applyPlayerTurnEndEffects();
-
-    // Ölü kartları kaldır (animasyonla)
-    this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
-
-    this._turn = Turn.Bot;
-
-    setTimeout(() => this.botTurn(), 1000); // Biraz daha fazla bekleme süresi
-  }
-
-  private onBotCombatCompleted() {
-    this._bot.hand.forEach(card => {
-      card.updateEffects();
+      if (this._turn === Turn.Bot && view.card.activeEffects) {
+        await this.applyEffectDamageIfOwner(view.card);
+        view.card.updateEffects();
+        view.updateCover();
+      }
     });
 
-    this._broadcast.emit(BroadcastEvents.CHECK_WARRIOR_RAGE, { playerCardViews: this._playerCardViews, botCardViews: this._botCardViews });
+    this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
 
-    this.applyBotTurnEndEffects();
-
-    // Ölü kartları kaldır (animasyonla)
+    // Ölü kartları kaldır
     this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
 
-    // Bot turn'ü bitir
-    this._turn = Turn.Player;
-  }
+    // Turn değiştir
+    this._turn = this._turn === Turn.Player ? Turn.Bot : Turn.Player;
 
-  private onUpdateCardAfterSkill(data: { targetCard: Card }): void {
-    const cardView = this.findCardView(data.targetCard);
-    if (cardView) {
-      cardView.updateStats();
-      cardView.updateCover();
-    }
+    this._turn === Turn.Bot && setTimeout(() => this.botTurn(), 2000);
   }
 
   private resolveZIndex(attacker: Player) {
