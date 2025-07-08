@@ -5,16 +5,16 @@ import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
 import { MoveOption } from "../shared/interfaces";
-import { AttackType, ClassType, Turn } from "../shared/enums";
+import { AttackType, ClassType, Turn, UnitType } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
 import gsap from "gsap";
 import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
-import { ClassAbilities } from "../shared/constants/abilities";
 import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
+import { DeckView } from "../ui/DeckView";
 
 export class Game {
   private _app: Application;
@@ -84,6 +84,8 @@ export class Game {
   }
 
   public start() {
+    const deckView = new DeckView();
+    this._app.stage.addChild(deckView);
     this.renderHands();
     this.setupInteraction();
   }
@@ -91,10 +93,11 @@ export class Game {
   private createPlayer(name: string): Player {
     // 1 leader and 9 random cards
     const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
-    const leaderKey = keys[Math.floor(Math.random() * keys.length)];
-    const leaderData = CharacterList[leaderKey];
+    const leaderKeys = keys.filter(key => CharacterList[key].unitType === UnitType.Leader);
+    const randomLeaderKey = leaderKeys[Math.floor(Math.random() * leaderKeys.length)];
+    const leaderData = CharacterList[randomLeaderKey];
     const leader = new LeaderCard(
-      { ...leaderData, ability: ClassAbilities[leaderData.classType]() },
+      { ...leaderData },
       Environment.crown
     );
 
@@ -113,7 +116,7 @@ export class Game {
         color: data.color,
         attackType: data.attackType,
         classType: data.classType,
-        ability: ClassAbilities[data.classType]()
+        unitType: data.unitType,
       });
       otherCards.push(card);
     }
@@ -204,21 +207,124 @@ export class Game {
   }
 
   private handlePlayerCardClick(view: CardView) {
+    if (this._defender || this._attacker) {
+      this._defender = null;
+
+      if (this._attacker === view) {
+        // Cancel selection
+        gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+
+        gsap.to(view.descriptionContainer, {
+          alpha: 0, duration: 0.2, onComplete: () => {
+            view.descriptionContainer.visible = false;
+          }
+        });
+
+        this._attacker = null;
+        return;
+      }
+
+      this._playerCardViews.forEach(v => {
+        if (v !== view) {
+          gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
+          gsap.to(v.descriptionContainer, {
+            alpha: 0, duration: 0.2, onComplete: () => {
+              v.descriptionContainer.visible = false;
+            }
+          });
+        }
+      });
+
+      this._botCardViews.forEach(v => {
+        gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
+        gsap.to(v.descriptionContainer, {
+          alpha: 0, duration: 0.2, onComplete: () => {
+            v.descriptionContainer.visible = false;
+          }
+        });
+      });
+
+      gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+
+      gsap.to(view.descriptionContainer, {
+        alpha: 1, duration: 0.2, onStart: () => {
+          view.descriptionContainer.visible = true;
+        }
+      });
+
+      this._attacker = view;
+
+      return;
+    }
+
     if (this._turn !== Turn.Player) return;
     if (this._attacker && this._attacker === view) {
       // Cancel selection
       gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+
+      gsap.to(view.descriptionContainer, {
+        alpha: 0, duration: 0.2, onComplete: () => {
+          view.descriptionContainer.visible = false;
+        }
+      });
+
       this._attacker = null;
       return;
     }
     if (!this._attacker) {
       this._attacker = view;
       gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+
+      gsap.to(view.descriptionContainer, {
+        alpha: 1, duration: 0.2, onStart: () => {
+          view.descriptionContainer.visible = true;
+        }
+      });
     }
   }
 
   private handleBotCardClick(view: CardView) {
-    if (this._turn !== Turn.Player || !this._attacker) return;
+    if (!this._attacker) {
+      if (this._defender === view) {
+        // Cancel selection
+        gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+
+        gsap.to(view.descriptionContainer, {
+          alpha: 0, duration: 0.2, onComplete: () => {
+            view.descriptionContainer.visible = false;
+          }
+        });
+
+        this._defender = null;
+        
+        return;        
+      }
+
+      this._defender = view;
+
+      this._botCardViews.forEach(v => {
+        if (v !== view) {
+          gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
+          gsap.to(v.descriptionContainer, {
+            alpha: 0, duration: 0.2, onComplete: () => {
+              v.descriptionContainer.visible = false;
+            }
+          });
+        }
+      });
+
+      gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+
+      gsap.to(view.descriptionContainer, {
+        alpha: 1, duration: 0.2, onStart: () => {
+          view.descriptionContainer.visible = true;
+        }
+      });
+
+      return;
+    }
+
+    if (this._turn !== Turn.Player) return;
     if (this._defender && this._defender === view) return;
 
     // TURN BAŞINDA SKILL KONTROLÜ - Player turn'ünün ilk saldırısında
@@ -237,7 +343,16 @@ export class Game {
 
     this._defender = view;
 
-    gsap.to(this._defender.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+    gsap.to(this._defender.scale, {
+      x: 1.2, y: 1.2, duration: 0.2, onStart: () => {
+        gsap.to([this._attacker!.descriptionContainer, this._defender?.descriptionContainer], {
+          alpha: 0, duration: 0.2, onComplete: () => {
+            this._attacker!.descriptionContainer.visible = false;
+            this._defender!.descriptionContainer.visible = false;
+          }
+        });
+      }
+    });
 
     this.resolveZIndex(this._player);
 
@@ -488,6 +603,11 @@ export class Game {
           const burnDamage = effect.value || 1;
           card.health = Math.max(0, card.health - burnDamage);
 
+          if (card.hasEffect(EffectType.WarriorRage)) {
+            const warriorRage = card.activeEffects.filter(e => e.type === EffectType.WarriorRage);
+            warriorRage.forEach(e => (e.duration = 0) && (e.value = undefined));
+          }
+
           const burnCardView = this.findCardView(card);
           if (burnCardView) {
             burnCardView.updateStats();
@@ -550,29 +670,35 @@ export class Game {
 
     this._playerCardViews.forEach(async view => {
       view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
-      view.updateStats();
-      view.updateCover();
 
       if (this._turn === Turn.Player && view.card.activeEffects) {
-        await this.applyEffectDamageIfOwner(view.card);
-        view.card.updateEffects();
-        view.updateCover();
+        await this.applyEffectDamageIfOwner(view.card).then(() => {
+          view.card.updateEffects().then(() => {
+            view.updateStats();
+          });
+        });
       }
+
+      await view.updateCover();
+      await view.updateStats();
     });
 
     this._botCardViews.forEach(async view => {
       view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
-      view.updateStats();
-      view.updateCover();
 
       if (this._turn === Turn.Bot && view.card.activeEffects) {
-        await this.applyEffectDamageIfOwner(view.card);
-        view.card.updateEffects();
-        view.updateCover();
+        await this.applyEffectDamageIfOwner(view.card).then(() => {
+          view.card.updateEffects().then(() => {
+            view.updateStats();
+          });
+        });
       }
+
+      await view.updateCover();
+      await view.updateStats();
     });
 
-    this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
+    await this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
 
     // Ölü kartları kaldır
     this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
@@ -702,7 +828,7 @@ export class Game {
       // Player hand'den de ölü kartları kaldır
       if (playerDeadViews && playerDeadViews.length > 0) {
         playerDeadViews.forEach((deadView: any) => {
-          const cardIndex = this._player.hand.findIndex(card => card.Id === deadView.card.Id);
+          const cardIndex = this._player.hand.findIndex(card => card.id === deadView.card.id);
           if (cardIndex !== -1) {
             //console.log(`Removing dead card ${deadView.card.Name} from player hand`);
             this._player.hand.splice(cardIndex, 1);
@@ -718,7 +844,7 @@ export class Game {
       // Bot hand'den de ölü kartları kaldır
       if (botDeadViews && botDeadViews.length > 0) {
         botDeadViews.forEach((deadView: any) => {
-          const cardIndex = this._bot.hand.findIndex(card => card.Id === deadView.card.Id);
+          const cardIndex = this._bot.hand.findIndex(card => card.id === deadView.card.id);
           if (cardIndex !== -1) {
             //console.log(`Removing dead card ${deadView.card.Name} from bot hand`);
             this._bot.hand.splice(cardIndex, 1);

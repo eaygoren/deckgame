@@ -3,10 +3,13 @@ export enum Turn {
     Bot,
 }
 export enum Rarity {
-    Common = "Common",
-    Rare = "Rare",
     Legendary = "Legendary",
+    Rare = "Rare",
+    Common = "Common"
+}
+export enum UnitType {
     Leader = "Leader",
+    Regular = "Regular"
 }
 export enum Color {
     Common = 0x696969,

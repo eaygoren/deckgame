@@ -147,17 +147,23 @@ export class CombatManager {
         for (const cardView of allCardViews) {
             const card = cardView?.card;
             if (!card) continue;
-
-            if (card.classType === ClassType.Warrior && card.health > 0 && !card.WarriorRageActivated) {
+            
+            if (card.classType === ClassType.Warrior && card.health > 0 && !card.hasEffect?.(EffectType.WarriorRage)) {
                 const initialHealth = this.getInitialHealth(card);
                 const currentHealthPercentage = (card.health / initialHealth) * 100;
 
                 if (currentHealthPercentage <= 50) {
                     const attackBonus = Math.floor(card.attack * 0.5);
                     card.attack += attackBonus;
-                    card.WarriorRageActivated = true;
 
                     //console.log(`${card.Name} enters berserker rage! Attack increased by ${attackBonus}!`);
+
+                    card.addEffect?.({
+                        type: EffectType.WarriorRage,
+                        target: card,
+                        duration: 999, // Permanent
+                        value: attackBonus // Bonus miktarını sakla
+                    });
 
                     if (cardView && !cardView.destroyed && cardView.parent) {
                         const abilityMessage = {
@@ -192,7 +198,7 @@ export class CombatManager {
             randomTarget.health = Math.max(0, randomTarget.health - mageDamage);
             //console.log(`${attacker.Name}'s Arcane Blast hits ${randomTarget.Name} for ${mageDamage} damage!`); // Find the target's view and show ability message and damage
 
-            const targetView = opponentCardViews.find(view => view.card.Id === randomTarget.Id);
+            const targetView = opponentCardViews.find(view => view.card.id === randomTarget.id);
 
             if (targetView && !targetView.destroyed && targetView.parent) {
                 this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {

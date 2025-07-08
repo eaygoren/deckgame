@@ -1,4 +1,4 @@
-import { AttackType, ClassType, Color, Rarity } from "../enums";
+import { AttackType, ClassType, Color, Rarity, UnitType } from "../enums";
 
 export const Characters = {
     Aerwyn: "Aerwyn", // %25 ihtimalle saldırılardan kaçınır
@@ -45,10 +45,11 @@ export const CharacterList = {
         cover: Characters.Aerwyn.toLowerCase(),
         attack: 6,
         health: 8,
-        rarity: Rarity.Legendary,
-        color: Color.Legendary,
+        rarity: Rarity.Common,
+        color: Color.Common,
         attackType: AttackType.Ranged,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Regular
     },
     Alien: {
         name: Characters.Alien,
@@ -58,7 +59,8 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Regular
     },
     Archangel: {
         name: Characters.Archangel,
@@ -68,7 +70,8 @@ export const CharacterList = {
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Leader
     },
     Archmage: {
         name: Characters.Archmage,
@@ -78,17 +81,19 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Assassin: {
         name: Characters.Assassin,
         cover: Characters.Assassin.toLowerCase(),
         attack: 8,
         health: 5,
-        rarity: Rarity.Common,
-        color: Color.Common,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Leader
     },
     Cerberus: {
         name: Characters.Cerberus,
@@ -98,7 +103,8 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Cyclop: {
         name: Characters.Cyclop,
@@ -108,7 +114,8 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Regular
     },
     Dragon: {
         name: Characters.Dragon,
@@ -118,7 +125,8 @@ export const CharacterList = {
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Leader
     },
     Elf: {
         name: Characters.Elf,
@@ -128,7 +136,8 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Leader
     },
     Ent: {
         name: Characters.Ent,
@@ -138,17 +147,19 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Regular
     },
     Gunslinger: {
         name: Characters.Gunslinger,
         cover: Characters.Gunslinger.toLowerCase(),
         attack: 8,
         health: 6,
-        rarity: Rarity.Legendary,
-        color: Color.Legendary,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Ranged,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Regular
     },
     Hathor: {
         name: Characters.Hathor,
@@ -158,27 +169,30 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Illusionist: {
         name: Characters.Illusionist,
         cover: Characters.Illusionist.toLowerCase(),
         attack: 6,
         health: 7,
-        rarity: Rarity.Rare,
-        color: Color.Rare,
+        rarity: Rarity.Common,
+        color: Color.Common,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Joker: {
         name: Characters.Joker,
         cover: Characters.Joker.toLowerCase(),
         attack: 3,
-        health: 6,
+        health: 8,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Rogue
+        classType: ClassType.Rogue,
+        unitType: UnitType.Regular
     },
     Knight: {
         name: Characters.Knight,
@@ -188,17 +202,19 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Regular
     },
     Lich: {
         name: Characters.Lich,
         cover: Characters.Lich.toLowerCase(),
         attack: 6,
         health: 8,
-        rarity: Rarity.Legendary,
-        color: Color.Legendary,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Leader
     },
     Monk: {
         name: Characters.Monk,
@@ -208,27 +224,30 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Leader
     },
     Phoenix: {
         name: Characters.Phoenix,
         cover: Characters.Phoenix.toLowerCase(),
         attack: 6,
         health: 8,
-        rarity: Rarity.Legendary,
-        color: Color.Legendary,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Ra: {
         name: Characters.Ra,
         cover: Characters.Ra.toLowerCase(),
         attack: 10,
         health: 5,
-        rarity: Rarity.Legendary,
-        color: Color.Legendary,
+        rarity: Rarity.Rare,
+        color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Regular
     },
     Reaper: {
         name: Characters.Reaper,
@@ -238,7 +257,8 @@ export const CharacterList = {
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Leader
     },
     Samurai: {
         name: Characters.Samurai,
@@ -248,7 +268,8 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Leader
     },
     Siren: {
         name: Characters.Siren,
@@ -258,7 +279,8 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Vampire: {
         name: Characters.Vampire,
@@ -268,7 +290,8 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Leader
     },
     Werewolf: {
         name: Characters.Werewolf,
@@ -278,7 +301,8 @@ export const CharacterList = {
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Regular
     },
     Wukong: {
         name: Characters.Wukong,
@@ -288,7 +312,8 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Warrior
+        classType: ClassType.Warrior,
+        unitType: UnitType.Regular
     },
     Zeus: {
         name: Characters.Zeus,
@@ -298,7 +323,8 @@ export const CharacterList = {
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
-        classType: ClassType.Mage
+        classType: ClassType.Mage,
+        unitType: UnitType.Regular
     },
     Zombie: {
         name: Characters.Zombie,
@@ -308,6 +334,7 @@ export const CharacterList = {
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
-        classType: ClassType.Tank
+        classType: ClassType.Tank,
+        unitType: UnitType.Regular
     },
 };

@@ -1,6 +1,6 @@
 import { Effects, Environment } from "../shared/constants/gameConfig";
-import { Color, Rarity, AttackType, ClassType } from "../shared/enums";
-import { IAbility, ICard, ILeaderCard } from "../shared/interfaces";
+import { Color, Rarity, AttackType, ClassType, UnitType } from "../shared/enums";
+import { ICard, ILeaderCard } from "../shared/interfaces";
 import { CombatContext, EffectType, ISkill, SkillEffect, SkillResult } from "../shared/interfaces/skillInterfaces";
 import { SkillFactory } from "./skills/SkillFactory";
 
@@ -15,14 +15,15 @@ export class Card implements ICard {
   protected _color: Color;
   protected _attackType: AttackType;
   protected _classType: ClassType;
-  protected _ability: IAbility;
+  protected _unitType: UnitType;
   protected _skill: ISkill | null = null;
   protected _activeEffects: SkillEffect[] = [];
   protected _skillUsedThisTurn: boolean = false;
+  protected _initialAttack?: number; // Yeni özellik, başlangıç attack değerini saklamak için
   protected _maxAttack?: number; // Orijinal attack değerini saklamak için
+  protected _initialHealth?: number; // Yeni özellik, başlangıç canını saklamak için
   protected _maxHealth: number; // Başlangıç canını saklamak için
   protected _effectCover?: string;
-  protected _warriorRageActivated: boolean = false;
 
   constructor(options: ICard) {
     this._id = Card.nextId++;
@@ -34,7 +35,9 @@ export class Card implements ICard {
     this._cover = options.cover;
     this._attackType = options.attackType;
     this._classType = options.classType;
-    this._ability = options.ability;
+    this._unitType = options.unitType;
+    this._initialHealth = this._health; // Başlangıç canını sakla
+    this._initialAttack = this._attack; // Başlangıç attack değerini sakla
     this._maxHealth = this._health; // Başlangıç canını sakla
     this._skill = SkillFactory.createSkill(this._name);
   }
@@ -79,11 +82,6 @@ export class Card implements ICard {
         if (!this._maxAttack) {
           this._maxAttack = this._attack;
         }
-
-        // Attack'ı azalt
-        const reductionAmount = Math.floor(this._attack * (effect.value || 0.5));
-        this._attack = Math.max(1, this._attack - reductionAmount);
-        break;
     }
   }
 
@@ -95,7 +93,7 @@ export class Card implements ICard {
     return this._activeEffects.some(e => e.type === effectType);
   }
 
-  public updateEffects(): void {
+  public async updateEffects(): Promise<void> {
     this._activeEffects = this._activeEffects.filter(effect => {
       effect.duration--;
 
@@ -118,10 +116,14 @@ export class Card implements ICard {
             this.removeEffect(EffectType.Zombify);
             this._effectCover = undefined;
             break;
+          case EffectType.WarriorRage:
+            this.removeEffect(EffectType.WarriorRage);
+            break;
         }
 
         // Attack reduction bittiğinde attack'ı restore et
         if (effect.type === EffectType.AttackReduction && this._maxAttack) {
+          this.removeEffect(EffectType.AttackReduction);
           this._attack = this._maxAttack; // Original attack'a geri dön
           this._maxAttack = undefined; // Temizle
         }
@@ -133,7 +135,7 @@ export class Card implements ICard {
     this._skillUsedThisTurn = false;
   }
 
-  public get Id(): number {
+  public get id(): number {
     return this._id;
   }
 
@@ -181,12 +183,8 @@ export class Card implements ICard {
     return this._classType;
   }
 
-  public get ability(): IAbility {
-    return this._ability;
-  }
-
-  public set ability(ability: IAbility) {
-    this._ability = ability;
+  public get unitType(): UnitType {
+    return this._unitType;
   }
 
   public get skill(): ISkill | null {
@@ -228,14 +226,6 @@ export class Card implements ICard {
   public set effectCover(value: string | undefined) {
     this._effectCover = value;
   }
-
-  public get WarriorRageActivated(): boolean {
-    return this._warriorRageActivated;
-  }
-
-  public set WarriorRageActivated(value: boolean) {
-    this._warriorRageActivated = value;
-  }
 }
 
 export class LeaderCard extends Card implements ILeaderCard {
@@ -254,7 +244,7 @@ export class LeaderCard extends Card implements ILeaderCard {
       color: card.color,
       attackType: card.attackType,
       classType: card.classType,
-      ability: card.ability,
+      unitType: card.unitType,
       skill: card.skill || null // Ensure skill is set if available
     });
 
@@ -271,7 +261,7 @@ export class LeaderCard extends Card implements ILeaderCard {
       color: this._color,
       attackType: this._attackType,
       classType: this._classType,
-      ability: this._ability,
+      unitType: this._unitType,
       skill: this._skill
     };
   }

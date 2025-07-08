@@ -62,7 +62,8 @@ export enum EffectType {
     Taunt = "taunt",
     StatSwap = "stat_swap",
     AttackCopy = "attack_copy",
-    Protection = "protection"
+    Protection = "protection",
+    WarriorRage = "warrior_rage"
 }
 
 export enum Target {

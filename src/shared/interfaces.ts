@@ -1,21 +1,11 @@
 import { Card } from "../game/Card";
 import { CardView } from "../ui/CardView";
-import { AttackType, ClassType, Color, Rarity } from "./enums";
+import { AttackType, ClassType, Color, Rarity, UnitType } from "./enums";
 import { ISkill, SkillEffect } from "./interfaces/skillInterfaces";
 
 export interface IAbility {
   name: string;
   description: string;
-}
-
-export interface SkillOptions {
-  attacker?: Card;
-  defender?: Card;
-  dealtDamage?: number;
-  ignoreDefense?: boolean;
-  isDefeated?: boolean;
-  isSkillDisabled?: boolean;
-  [key: string]: any;
 }
 
 export interface ILeaderCard{
@@ -32,7 +22,7 @@ export interface ICard {
   color: Color;
   attackType: AttackType;
   classType: ClassType;
-  ability: IAbility;
+  unitType: UnitType;
   skill?: ISkill | null;
   activeEffects?: SkillEffect[];
   skillUsedThisTurn?: boolean; // Yeni özellik, bu kartın bu turda skill kullanılıp kullanılmadığını saklar

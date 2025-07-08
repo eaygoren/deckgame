@@ -1,18 +1,21 @@
 import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import { Card, LeaderCard } from "../game/Card";
-import { AttackType, ClassType, Color } from "../shared/enums";
+import { AttackType, ClassType, Color, UnitType } from "../shared/enums";
 import { EFFECT_FILTERS, Environment } from "../shared/constants/gameConfig";
 import { AdjustmentFilter } from "pixi-filters";
+import { EffectType } from "../shared/interfaces/skillInterfaces";
 
 export class CardView extends Container {
   private _cardContainer!: Container; // Container for the card
   private _skillContainer!: Container; // Container for the skill text area
+  private _descriptionContainer!: Container; // Container for the description text area
   private _card: Card;
-  private _cover!: Sprite; // Cover image path
-  private _effectCover!: Sprite; // Effect image path
+  private _cover!: Sprite; // Cover image
+  private _effectCover!: Sprite; // Effect image
   private _skillText!: Text; // Skill text reference
   private _statText!: Text; // Stat text reference
   private _attackType!: Sprite; // Attack type icon
+  private _descriptionText!: Text; // Skill description text
 
   constructor(card: Card) {
     super();
@@ -28,38 +31,36 @@ export class CardView extends Container {
   }
 
   private drawCard() {
-    this._skillContainer = new Container();
-    this._skillContainer.label = "SkillContainer";
+    this._skillContainer = new Container({ label: "SkillContainer" });
     this.addChild(this._skillContainer);
-
-    const skillTextArea = new Graphics();
-    skillTextArea.beginPath();
-    skillTextArea.roundRect(-90, 230, 180, 45, 10);
-    skillTextArea.stroke({ color: 0x000000, width: 3 });
-    skillTextArea.fill({ color: 0x000000, alpha: 0.5 });
-    skillTextArea.closePath();
-    skillTextArea.label = "SkillTextArea";
-    this._skillContainer.addChild(skillTextArea);
-
-    let text = this.card.skill ? this.card.skill.name : "No Skill";
-    this._skillText = new Text({ text: text, style: { fontSize: 20, fill: 0xfafafa } });
-    this._skillText.anchor.set(0.5);
-    this._skillText.position.set(0, 260);
-    this._skillText.label = "Skill";
-    this._skillContainer.addChild(this._skillText);
 
     // Create a container for the card
     this._cardContainer = new Container({ label: "CardContainer" });
     this.addChild(this._cardContainer);
 
+    const skillTextArea = new Graphics();
+    skillTextArea.beginPath();
+    skillTextArea.roundRect(-105, 230, 210, 45, 10);
+    skillTextArea.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 3 });
+    skillTextArea.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, alpha: 0.5 });
+    skillTextArea.closePath();
+    skillTextArea.label = "SkillTextArea";
+    this._skillContainer.addChild(skillTextArea);
+
+    let text = this.card.skill ? this.card.skill.name : "No Skill";
+    this._skillText = new Text({ text: text, style: { fontSize: 20, fill: 0x000000 } });
+    this._skillText.anchor.set(0.5);
+    this._skillText.position.set(0, 260);
+    this._skillText.label = "Skill";
+    this._skillContainer.addChild(this._skillText);
+
     const mask = new Graphics();
     mask.beginPath();
-    mask.roundRect(-125, -125, 250, 370, 20);
+    mask.roundRect(-130, -125, 260, 370, 20);
     mask.fill({ color: 0x000000, alpha: 0.75 });
     mask.closePath();
     mask.label = "Mask";
     this._cardContainer.addChild(mask);
-    this._cardContainer.mask = mask;
 
     this._cover = Sprite.from(this._card.cover);
     this._cover.anchor.set(0.5, 1);
@@ -76,25 +77,29 @@ export class CardView extends Container {
     this._effectCover.visible = false; // Initially hidden
     this._cardContainer.addChild(this._effectCover);
 
-    const background = new Graphics();
-    background.beginPath();
-    background.roundRect(-125, -125, 250, 370, 20);
-    background.stroke({ color: 0x000000, width: 6 });
-    background.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, alpha: 0 });
-    background.closePath();
-    background.label = "Background";
-    this._cardContainer.addChild(background);
-
     const seperator = new Graphics();
     seperator.beginPath();
-    seperator.rect(-130, 170, 260, 80);
-    seperator.stroke({ color: 0x000000, width: 3 });
+    seperator.rect(-130, 155, 260, 120);
+    // seperator.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 8 });
     seperator.fill({ color: 0x000000, alpha: 0.5 });
     seperator.closePath();
     seperator.label = "Seperator";
     this._cardContainer.addChild(seperator);
 
-    let attackTypeIcon: string = "";
+    this._descriptionContainer = new Container({ label: "DescriptionContainer" });
+    this._cardContainer.addChild(this._descriptionContainer);
+    this._descriptionContainer.visible = false;
+    this._descriptionContainer.alpha = 0;
+
+    const background = new Graphics();
+    background.beginPath();
+    background.roundRect(-130, -125, 260, 370, 20);
+    background.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 10 });
+    background.closePath();
+    background.label = "Background";
+    this._cardContainer.addChild(background);
+
+    let attackTypeIcon: string;
     switch (this._card.attackType) {
       case AttackType.Melee:
         attackTypeIcon = Environment.melee;
@@ -108,12 +113,12 @@ export class CardView extends Container {
       this._attackType = Sprite.from(attackTypeIcon);
       this._attackType.anchor.set(0.5, 0.5);
       this._attackType.scale.set(1);
-      this._attackType.position.set(-90, 207);
+      this._attackType.position.set(-95, 185);
       this._attackType.label = "AttackTypeIcon";
       this._cardContainer.addChild(this._attackType);
     }
 
-    let classTypeIcon: string = "";
+    let classTypeIcon: string;
     switch (this._card.classType) {
       case ClassType.Tank:
         classTypeIcon = Environment.tank;
@@ -133,26 +138,51 @@ export class CardView extends Container {
       const classTypeSprite = Sprite.from(classTypeIcon);
       classTypeSprite.anchor.set(0.5, 0.5);
       classTypeSprite.scale.set(1);
-      classTypeSprite.position.set(90, 207);
+      classTypeSprite.position.set(95, 185);
       classTypeSprite.label = "ClassTypeIcon";
       this._cardContainer.addChild(classTypeSprite);
     }
 
-    const nameText = new Text({ text: this._card.name, style: { fontSize: 20, fill: 0xfafafa } });
+    const nameText = new Text({ text: this._card.name, style: { fontFamily: "Arial", fontSize: 25, fill: 0xfafafa } });
     nameText.anchor.set(0.5);
-    nameText.position.set(0, 190);
+    nameText.position.set(0, 185);
     nameText.label = "Name";
     this._cardContainer.addChild(nameText);
 
-    if (this._card instanceof LeaderCard) {
-      const crown = Sprite.from(this._card.crown);
-      crown.anchor.set(0.5, 0);
-      crown.scale.set(0.1);
-      crown.position.set(105, -187);
-      crown.angle = 15;
-      crown.label = "Crown";
-      this.addChild(crown);
-    }
+    const crown = Sprite.from(Environment.crown);
+    crown.anchor.set(0.5, 0);
+    crown.scale.set(0.1);
+    crown.position.set(110, -185);
+    crown.angle = 15;
+    crown.label = "Crown";
+    crown.alpha = this._card.unitType === UnitType.Leader ? 1 : 0; // Only show crown for Leader cards
+    this.addChild(crown);
+
+    const descriptionBg = new Graphics();
+    descriptionBg.beginPath();
+    descriptionBg.rect(-125, -120, 250, 275);
+    descriptionBg.fill({ color: 0x000000, alpha: 0.5 });
+    descriptionBg.closePath();
+    descriptionBg.label = "DescriptionBackground";
+    this._descriptionContainer.addChild(descriptionBg);
+
+    this._descriptionText = new Text({
+      text: this._card.skill?.description,
+      style: {
+        fontFamily: "Arial",
+        align: "center",
+        fontSize: 25,
+        fill: 0xfafafa,
+        wordWrap: true,
+        wordWrapWidth: 230
+      }
+    });
+    this._descriptionText.anchor.set(0.5, 0);
+    this._descriptionText.position.set(0, -100);
+    this._descriptionText.label = "Description";
+    this._descriptionContainer.addChild(this._descriptionText);
+
+    this._cardContainer.mask = mask;
 
     this.updateStats();
   }
@@ -164,45 +194,50 @@ export class CardView extends Container {
     }
 
     // Stats text güncelleme
-    let attackText = `A: ${this._card.attack}`;
-    if (this._card.classType === ClassType.Warrior && this._card.WarriorRageActivated) {
-      const originalAttack = Math.floor(this._card.attack / 1.5);
-      const bonus = this._card.attack - originalAttack;
-      attackText = `A: ${originalAttack} + (${bonus})`;
+    let attackText = `⚔️ ${this._card.attack}`;
+
+    // Effect sisteminden bonus değerini al
+    if (this._card.classType === ClassType.Warrior && this._card.hasEffect(EffectType.WarriorRage)) {
+      const warriorRageEffect = this._card.activeEffects?.find(effect => effect.type === EffectType.WarriorRage);
+
+      if (warriorRageEffect && warriorRageEffect.value) {
+        const bonus = warriorRageEffect.value;
+        const originalAttack = this._card.attack - bonus;
+        attackText = `⚔️ ${originalAttack} + (${bonus})`;
+      }
     }
 
     this._statText = new Text({
-      text: `${attackText} H: ${this._card.health}`,
-      style: { fontSize: 20, fill: 0xfafafa }
+      text: `${attackText}  ❤️ ${this._card.health}`,
+      style: { fontSize: 25, fill: 0xfafafa }
     });
     this._statText.anchor.set(0.5);
-    this._statText.position.set(0, 220);
+    this._statText.position.set(0, 225);
     this._statText.label = "Stats";
     this._cardContainer.addChild(this._statText);
   }
 
   public async updateCover() {
-    if (this._card.activeEffects && this._card.activeEffects.length > 0) {
+    if (this._card.activeEffects && this._card.activeEffects.length > 0 && this._card.effectCover) {
       for (const activeEffect of this._card.activeEffects) {
         const effectType = activeEffect.type;
-        
-        if (effectType && this._card.effectCover) {
-          this._effectCover.texture = Texture.from(this._card.effectCover);
-          this._effectCover.visible = true;
-        }
+
+        this._effectCover.texture = Texture.from(this._card.effectCover);
+        this._effectCover.visible = true;
 
         // Filter uygula (her effect için)
-        const filterConfig = effectType && effectType in EFFECT_FILTERS
-          ? EFFECT_FILTERS[effectType as keyof typeof EFFECT_FILTERS]
-          : null;
+        const filterConfig = effectType in EFFECT_FILTERS ? EFFECT_FILTERS[effectType as keyof typeof EFFECT_FILTERS] : null;
         this._cover.filters = filterConfig ? [new AdjustmentFilter(filterConfig)] : [];
       }
-    }else{
+    } else {
       this._effectCover.texture = Texture.EMPTY;
       this._effectCover.visible = false;
       this._cover.filters = [];
     }
-    
+  }
+
+  public get descriptionContainer(): Container {
+    return this._descriptionContainer;
   }
 
   // public updateAttackType(attackType: AttackType) {
