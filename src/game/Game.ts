@@ -14,7 +14,6 @@ import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
 import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
-import { DeckView } from "../ui/DeckView";
 
 export class Game {
   private _app: Application;
@@ -30,7 +29,7 @@ export class Game {
   private _defender: CardView | null = null;
   private _turn: Turn = Turn.Player;
 
-  constructor(app: Application) {
+  constructor(app: Application, playerDeck?: Deck) {
     this._app = app;
     this._broadcast = Broadcast.getInstance();
     this._battlefield = BattleField.getInstance();
@@ -38,42 +37,11 @@ export class Game {
     this._combatManager = CombatManager.getInstance();
     this._animationManager = AnimationManager.getInstance();
     // create players
-    this._player = this.createPlayer("Player");
+    this._player = new Player("Player", playerDeck || this.createPlayer("Player").deck);
     this._bot = this.createPlayer("Bot");
 
     this.eventListeners();
-    // setTimeout(() => {
-    //   this.testSkillSystem();
-    // }, 1000);
   }
-
-  /*private testSkillSystem(): void {
-    console.log("=== SKILL SYSTEM TEST ===");
-
-    console.log("\n\n=== Player Hand ===");
-    // Player kartlarındaki skill'leri test et
-    this._player.hand.forEach(card => {
-      if (card.skill) {
-        console.log(`\n${card.name} skill: ${card.skill.name} - ${card.skill.description}`);
-        console.log(`\nTrigger timing: ${card.skill.triggerTiming}`);
-      } else {
-        console.log(`\n${card.name} has no skill`);
-      }
-    });
-
-    console.log("\n\n=== Bot Hand ===");
-    // Bot kartlarındaki skill'leri test et
-    this._bot.hand.forEach(card => {
-      if (card.skill) {
-        console.log(`\n${card.name} skill: ${card.skill.name} - ${card.skill.description}`);
-        console.log(`\nTrigger timing: ${card.skill.triggerTiming}`);
-      } else {
-        console.log(`\n${card.name} has no skill`);
-      }
-    });
-
-    console.log("\n\n=== TEST COMPLETED ===");
-  }*/
 
   private eventListeners() {
     this._broadcast.on(BroadcastEvents.TURN_COMPLETED, this.onTurnCompleted.bind(this));
@@ -84,8 +52,6 @@ export class Game {
   }
 
   public start() {
-    const deckView = new DeckView();
-    this._app.stage.addChild(deckView);
     this.renderHands();
     this.setupInteraction();
   }
@@ -106,8 +72,11 @@ export class Game {
     // 9 random cards
     const otherCards: Card[] = [];
     for (let i = 0; i < 9; i++) {
-      const key = keys[Math.floor(Math.random() * keys.length)];
-      const data = CharacterList[key]; const card = new Card({
+      const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
+      const nonLeaderKeys = keys.filter(key => CharacterList[key].unitType !== UnitType.Leader);
+      const randomKey = nonLeaderKeys[Math.floor(Math.random() * nonLeaderKeys.length)];
+      const data = CharacterList[randomKey];
+      const card = new Card({
         name: data.name,
         cover: data.cover,
         attack: data.attack,

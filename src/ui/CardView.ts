@@ -41,8 +41,8 @@ export class CardView extends Container {
     const skillTextArea = new Graphics();
     skillTextArea.beginPath();
     skillTextArea.roundRect(-105, 230, 210, 45, 10);
-    skillTextArea.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 3 });
-    skillTextArea.fill({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, alpha: 0.5 });
+    skillTextArea.stroke({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, width: 3 });
+    skillTextArea.fill({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, alpha: 0.5 });
     skillTextArea.closePath();
     skillTextArea.label = "SkillTextArea";
     this._skillContainer.addChild(skillTextArea);
@@ -94,7 +94,7 @@ export class CardView extends Container {
     const background = new Graphics();
     background.beginPath();
     background.roundRect(-130, -125, 260, 370, 20);
-    background.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 10 });
+    background.stroke({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, width: 10 });
     background.closePath();
     background.label = "Background";
     this._cardContainer.addChild(background);
@@ -241,8 +241,8 @@ export class CardView extends Container {
   }
 
   // public updateAttackType(attackType: AttackType) {
-  //   this._card.attackType = attackType;
   //   if (this._attackType) {
+  //     this._card.attackType = attackType;
   //     this._attackType.texture = Sprite.from(Environment[attackType]).texture;
   //   }
   // }

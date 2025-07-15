@@ -1,4 +1,3 @@
-/* Genel stil ayarları */
 body {
   margin: 0;
   padding: 0;
@@ -18,7 +17,6 @@ body {
   overflow: hidden;
 }
 
-/* PIXI sahnesinin bulunduğu kapsayıcı */
 #pixi-container {
   width: 100vw;
   height: 100vh;
@@ -28,7 +26,6 @@ body {
   overflow: hidden;
 }
 
-/* PIXI canvas */
 canvas {
   width: 100% !important;
   height: 100% !important;
@@ -38,7 +35,6 @@ canvas {
   object-fit: contain;
 }
 
-/* Dikey modda uyarı mesajı */
 #rotateMessage {
   display: none;
   position: absolute;
@@ -55,7 +51,6 @@ canvas {
   text-align: center;
 }
 
-/* Dikey mod: sadece uyarı göster */
 @media screen and (orientation: portrait) {
   #rotateMessage {
     display: flex;
@@ -66,7 +61,6 @@ canvas {
   }
 }
 
-/* Yatay mod: oyun görünür, uyarı gizli */
 @media screen and (orientation: landscape) {
   #rotateMessage {
     display: none;
@@ -75,4 +69,30 @@ canvas {
   #pixi-container {
     display: flex;
   }
+}
+
+#confirm-deck {
+  position: absolute;
+  bottom: 5px;
+  z-index: 10;
+  padding: 10px 20px;
+  background-color: #ff3333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#confirm-deck:hover {
+  background-color: #666;
+}
+
+#confirm-deck:active {
+  background-color: #888;
+}
+
+#confirm-deck:disabled {
+  background-color: #444;
+  cursor: not-allowed;
 }
