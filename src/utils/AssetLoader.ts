@@ -1,11 +1,12 @@
 import { Assets } from "pixi.js";
-import { CharacterSource, Environment } from "../shared/constants";
+import { Characters } from "../shared/constants/characters";
+import { Effects, Environment } from "../shared/constants/gameConfig";
 
 export class AssetLoader {
-  static async loadAll(): Promise<void> {
-    const chars = Object.values(CharacterSource).map((alias) => ({
-      alias,
-      src: `assets/characters/${alias}.png`
+  public static async loadAll(): Promise<void> {
+    const chars = Object.values(Characters).map((alias) => ({
+      alias: alias.toLowerCase(),
+      src: `assets/character/${alias.toLowerCase()}.png`
     }));
 
     const env = Object.values(Environment).map((alias) => ({
@@ -13,7 +14,13 @@ export class AssetLoader {
       src: `assets/environment/${alias}.png`
     }));
 
+    const effects = Object.values(Effects).map((alias) => ({
+      alias,
+      src: `assets/effects/${alias}.png`
+    }));
+
     await Assets.load(chars);
     await Assets.load(env);
+    await Assets.load(effects);
   }
 }

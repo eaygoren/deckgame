@@ -8,7 +8,9 @@
     "dev": "vite"
   },
   "dependencies": {
+    "@pixi/ui": "^2.2.4",
     "gsap": "^3.13.0",
+    "pixi-filters": "^6.1.3",
     "pixi.js": "^8.9.2"
   },
   "devDependencies": {

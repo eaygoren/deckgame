@@ -1,6 +1,7 @@
 import { Application } from "pixi.js";
 import { AssetLoader } from "./utils/AssetLoader";
 import { Game } from "./game/Game";
+import { DeckView } from "./ui/DeckView";
 
 const app = new Application();
 
@@ -10,7 +11,7 @@ const app = new Application();
     width: 1920,
     height: 1080,
     resolution: window.devicePixelRatio || 1,
-    backgroundColor: 0xfafafa,
+    backgroundColor: 0x5c454d,
     resizeTo: window,
   });
 
@@ -34,6 +35,15 @@ const app = new Application();
   
   window.addEventListener("resize", updateScale);
   updateScale();
-  // Start the game
-  new Game(app).start();
+
+  const playerDeck = new DeckView(app);
+
+  const confirmDeckButton = document.getElementById("confirm-deck");
+
+  confirmDeckButton?.addEventListener("click", () => {
+    confirmDeckButton.style.display = "none"; // Hide the button after confirming the deck
+    console.log("Deck confirmed:", playerDeck.getDeckCards());
+    // Start the game
+    new Game(app, playerDeck.getDeckCards()).start();
+  });
 })();

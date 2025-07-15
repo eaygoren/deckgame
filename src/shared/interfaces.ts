@@ -1,11 +1,16 @@
-import { Card, Color, Faction, Rarity, Class } from "../game/Card";
-import { Game } from "../game/Game";
-import { Player } from "../game/Player";
+import { Card } from "../game/Card";
+import { CardView } from "../ui/CardView";
+import { AttackType, ClassType, Color, Rarity, UnitType } from "./enums";
+import { ISkill, SkillEffect } from "./interfaces/skillInterfaces";
 
 export interface IAbility {
   name: string;
   description: string;
-  activate(card: Card, owner: Player, game?: Game): void;
+}
+
+export interface ILeaderCard{
+  card: ICard;
+  crown: string;
 }
 
 export interface ICard {
@@ -13,16 +18,26 @@ export interface ICard {
   cover: string;
   attack: number;
   health: number;
-  faction: Faction;
   rarity: Rarity;
   color: Color;
-  class: Class;
-  ability?: IAbility;
-  crown?: string;
+  attackType: AttackType;
+  classType: ClassType;
+  unitType: UnitType;
+  skill?: ISkill | null;
+  activeEffects?: SkillEffect[];
+  skillUsedThisTurn?: boolean; // Yeni özellik, bu kartın bu turda skill kullanılıp kullanılmadığını saklar
+  maxHealth?: number; // Yeni özellik, başlangıç canını saklamak için
 }
 
 export interface MoveOption {
   attacker: Card;
   defender: Card;
   score: number;
+}
+
+export interface CombatOption {
+  attacker: CardView;
+  defender: CardView;
+  attackDamage: number;
+  counterDamage: number;
 }
