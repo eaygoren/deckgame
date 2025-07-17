@@ -5,7 +5,7 @@ import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
 import { MoveOption } from "../shared/interfaces";
-import { AttackType, ClassType, Turn, UnitType } from "../shared/enums";
+import { AttackType, ClassType, Rarity, Turn, UnitType } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
@@ -29,7 +29,7 @@ export class Game {
   private _defender: CardView | null = null;
   private _turn: Turn = Turn.Player;
 
-  constructor(app: Application, playerDeck?: Deck) {
+  constructor(app: Application, playerDeck: Deck) {
     this._app = app;
     this._broadcast = Broadcast.getInstance();
     this._battlefield = BattleField.getInstance();
@@ -37,8 +37,8 @@ export class Game {
     this._combatManager = CombatManager.getInstance();
     this._animationManager = AnimationManager.getInstance();
     // create players
-    this._player = new Player("Player", playerDeck || this.createPlayer("Player").deck);
-    this._bot = this.createPlayer("Bot");
+    this._player = this.createPlayer(playerDeck);
+    this._bot = this.createBot();
 
     this.eventListeners();
   }
@@ -56,27 +56,113 @@ export class Game {
     this.setupInteraction();
   }
 
-  private createPlayer(name: string): Player {
-    // 1 leader and 9 random cards
+  private createPlayer(deck: Deck): Player {
+    const leader = deck.leader;
+    console.log("Player leader card:", leader);
+
+    const nonLeaderCards = deck.cards.filter(c => c.unitType !== UnitType.Leader);
+    const randomSelectedCards = this.getRandomUniqueItems(nonLeaderCards, 4);
+
+    const handCards: Card[] = [leader!, ...randomSelectedCards];
+    console.log("Player hand cards:", handCards);
+
+    const remainingCards = nonLeaderCards.filter(card => !randomSelectedCards.includes(card));
+    const deckCards: Card[] = remainingCards;
+    console.log("Player deck cards after hand:", deckCards);
+
+    if (leader) {
+      deck.cards = [leader, ...deckCards];
+    }
+
+    const player = new Player("Player", deck);
+    player.hand = handCards;
+
+    return player;
+  }
+
+  private createBot(): Player {
+    // Select a random leader card
     const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
     const leaderKeys = keys.filter(key => CharacterList[key].unitType === UnitType.Leader);
     const randomLeaderKey = leaderKeys[Math.floor(Math.random() * leaderKeys.length)];
     const leaderData = CharacterList[randomLeaderKey];
-    const leader = new LeaderCard(
-      { ...leaderData },
-      Environment.crown
-    );
+    const leader = new LeaderCard({ ...leaderData }, Environment.crown);
 
     const deck = new Deck();
     deck.setLeader(leader);
-    // 9 random cards
-    const otherCards: Card[] = [];
-    for (let i = 0; i < 9; i++) {
-      const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
-      const nonLeaderKeys = keys.filter(key => CharacterList[key].unitType !== UnitType.Leader);
-      const randomKey = nonLeaderKeys[Math.floor(Math.random() * nonLeaderKeys.length)];
-      const data = CharacterList[randomKey];
-      const card = new Card({
+
+    // Set remaining card limits
+    let remainingLegendary = 2;
+    let remainingRare = 4;
+    let remainingCommon = 4; // 10 total - 1 leader = 9, flexible
+
+    // Set limits based on leader's rarity
+    switch (leader.rarity) {
+      case Rarity.Legendary:
+        remainingLegendary = Math.max(0, remainingLegendary - 1);
+        break;
+      case Rarity.Rare:
+        remainingRare = Math.max(0, remainingRare - 1);
+        break;
+      case Rarity.Common:
+        remainingCommon = Math.max(0, remainingCommon - 1);
+        break;
+    }
+
+    // Select the remaining 9 cards in a balanced way
+    const otherCards = this.getFlexibleBalancedCards(
+      remainingLegendary,
+      remainingRare,
+      remainingCommon
+    );
+
+    // Hand and deck separation
+    const handCards = [leader, ...otherCards.slice(0, 4)];
+    const deckCards = otherCards.slice(4);
+    deck.cards = [leader, ...deckCards];
+    const player = new Player("Bot", deck);
+    player.hand = handCards;
+
+    return player;
+  }
+
+  private getFlexibleBalancedCards(maxLegendary: number, maxRare: number, maxCommon: number): Card[] {
+    const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
+    const nonLeaderKeys = keys.filter(key => CharacterList[key].unitType !== UnitType.Leader);
+
+    // Separate cards by rarity
+    const legendaryKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Legendary);
+    const rareKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Rare);
+    const commonKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Common);
+
+    const selectedKeys: (keyof typeof CharacterList)[] = [];
+
+    // First, select legendary cards (up to maxLegendary)
+    const legendarySelected = this.getRandomUniqueItems(legendaryKeys, maxLegendary);
+    selectedKeys.push(...legendarySelected);
+
+    // Next, select rare cards (up to maxRare)
+    const rareSelected = this.getRandomUniqueItems(rareKeys, maxRare);
+    selectedKeys.push(...rareSelected);
+
+    // Then, fill the rest with common cards
+    const remainingSlots = 9 - selectedKeys.length;
+    const commonSelected = this.getRandomUniqueItems(commonKeys, Math.min(remainingSlots, maxCommon));
+    selectedKeys.push(...commonSelected);
+
+    // If we still have slots left, fill with more rare cards
+    const stillRemaining = 9 - selectedKeys.length;
+    if (stillRemaining > 0) {
+      const extraRare = this.getRandomUniqueItems(
+        rareKeys.filter(key => !selectedKeys.includes(key)),
+        stillRemaining
+      );
+      selectedKeys.push(...extraRare);
+    }
+
+    return selectedKeys.map(key => {
+      const data = CharacterList[key];
+      return new Card({
         name: data.name,
         cover: data.cover,
         attack: data.attack,
@@ -87,15 +173,12 @@ export class Game {
         classType: data.classType,
         unitType: data.unitType,
       });
-      otherCards.push(card);
-    }
-    // Hand and deck separation: 4 cards in hand, 5 cards in deck (leader is always in hand)
-    const handCards = [leader, ...otherCards.slice(0, 4)];
-    const deckCards = otherCards.slice(4);
-    deck.cards = [leader, ...deckCards]; // leader must also be in deck.cards (for getPlayableHand)
-    const player = new Player(name, deck);
-    player.hand = handCards;
-    return player;
+    });
+  }
+
+  private getRandomUniqueItems<T>(array: T[], count: number): T[] {
+    const shuffled = [...array].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, Math.min(count, array.length));
   }
 
   private renderHands() {
@@ -103,8 +186,8 @@ export class Game {
     this._playerCardViews = [];
     this._botCardViews = [];
     // Show deck counts through BattleField (exclude leader from count)
-    const playerDeckCount = this._player.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
-    const botDeckCount = this._bot.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
+    const playerDeckCount = this._player.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
+    const botDeckCount = this._bot.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
     this._battlefield.showDeckCounts(playerDeckCount, botDeckCount);
     // Player hand layout
     this.renderHand(this._player, 750, this._playerCardViews);
@@ -114,12 +197,14 @@ export class Game {
 
   private renderHand(player: Player, y: number, viewArr: CardView[]) {
     const hand = [...player.hand];
+    console.log(`Rendering hand for ${player.name}:`, hand);
     const occupiedSlots = new Set<number>();
 
     //console.log(`=== Rendering ${player === this._player ? 'Player' : 'Bot'} Hand ===`);
 
     // İlk önce leader'ı slot 2'ye yerleştir
-    const leaderCard = hand.find(c => c instanceof LeaderCard);
+    const leaderCard = hand.find(c => c.unitType === UnitType.Leader);
+    console.log(`Leader card for ${player.name}:`, leaderCard);
     if (leaderCard) {
       const cardView = new CardView(leaderCard);
       cardView.x = CARD_POSITIONS[2].x; // Leader her zaman slot 2
@@ -131,7 +216,7 @@ export class Game {
     }
 
     // Sonra diğer kartları boş slot'lara yerleştir
-    const otherCards = hand.filter(c => !(c instanceof LeaderCard));
+    const otherCards = hand.filter(c => c.unitType !== UnitType.Leader);
     otherCards.forEach(card => {
       let targetSlot = -1;
 
@@ -265,8 +350,8 @@ export class Game {
         });
 
         this._defender = null;
-        
-        return;        
+
+        return;
       }
 
       this._defender = view;
@@ -302,8 +387,8 @@ export class Game {
     }
 
     // Lider kartına sadece karşı tarafın sadece lideri kaldığında saldırılabilir
-    if (view.card instanceof LeaderCard) {
-      const nonLeaderCards = this._bot.hand.filter(c => !(c instanceof LeaderCard));
+    if (view.card.unitType === UnitType.Leader) {
+      const nonLeaderCards = this._bot.hand.filter(c => c.unitType !== UnitType.Leader);
       if (nonLeaderCards.length > 0) {
         // Henüz lider olmayan kartlar var, lidere saldıramazsın
         return;
@@ -349,12 +434,12 @@ export class Game {
     this.triggerStartOfTurnSkills();
 
     // Bot için hedef seçimi: Lider kartına sadece oyuncunun sadece lideri kaldığında saldırabilir
-    const playerNonLeaderCards = this._player.hand.filter(c => !(c instanceof LeaderCard));
+    const playerNonLeaderCards = this._player.hand.filter(c => c.unitType !== UnitType.Leader);
     let availableTargetViews = this._playerCardViews;
 
     if (playerNonLeaderCards.length > 0) {
       // Oyuncuda lider olmayan kartlar varsa, sadece onlara saldırabilir
-      availableTargetViews = this._playerCardViews.filter(view => !(view.card instanceof LeaderCard));
+      availableTargetViews = this._playerCardViews.filter(view => view.card.unitType !== UnitType.Leader);
     }
 
     // Eğer hedef yoksa çık (bu durumda zaten oyun biter)
@@ -405,7 +490,7 @@ export class Game {
     const attackerTakesCounterDamage = attacker.attackType === AttackType.Melee;
     const attackerWillDie = attackerTakesCounterDamage ? attacker.health <= counterDamage : false;
 
-    if (attacker instanceof LeaderCard && attackerWillDie) {
+    if (attacker.unitType === UnitType.Leader && attackerWillDie) {
       return -10000; // Çok düşük skor ver, asla seçilmesin
     }
 
@@ -723,7 +808,7 @@ export class Game {
 
   private checkForWinner() {
     // Kazananı kontrol et
-    if (!this._player.hand.some(c => c instanceof LeaderCard)) {
+    if (!this._player.hand.some(c => c.unitType === UnitType.Leader)) {
       this._turn = Turn.Player;
       // Oyun bittiğinde tüm animasyonları durdur
       this._animationManager.stopAllAnimations();
@@ -733,7 +818,7 @@ export class Game {
       }
       return;
     }
-    if (!this._bot.hand.some(c => c instanceof LeaderCard)) {
+    if (!this._bot.hand.some(c => c.unitType === UnitType.Leader)) {
       this._turn = Turn.Player;
       // Oyun bittiğinde tüm animasyonları durdur
       this._animationManager.stopAllAnimations();
@@ -769,8 +854,8 @@ export class Game {
     this._turn = Turn.Player;
 
     // Yeni oyuncular oluştur (yeni kartlarla)
-    this._player = this.createPlayer("Player");
-    this._bot = this.createPlayer("Bot");
+    // this._player = this.createPlayer("Player");
+    this._bot = this.createBot();
 
     // Oyunu yeniden başlat
     this.renderHands();
@@ -870,8 +955,8 @@ export class Game {
         this._botCardViews
       );
       // Deck sayılarını güncelle
-      const playerDeckCount = this._player.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
-      const botDeckCount = this._bot.deck.cards.filter(c => !(c instanceof LeaderCard)).length;
+      const playerDeckCount = this._player.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
+      const botDeckCount = this._bot.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
       this._battlefield.updateDeckCounts(playerDeckCount, botDeckCount);
     }
   }

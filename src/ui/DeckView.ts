@@ -120,6 +120,8 @@ export class DeckView extends Container {
                             this._poolCards = this._poolCards.filter(c => c !== cardView);
                             this._poolCount--;
 
+                            this._deckCount === this._maxDeckCards && this.emit("DeckReady"); // Emit event when deck is ready
+
                             this.updateSelectableCards();
                         } else {
                             this.applySelectAnimation(cardView);
@@ -134,6 +136,8 @@ export class DeckView extends Container {
 
                         this._deckCards = this._deckCards.filter(c => c !== cardView);
                         this._deckCount--;
+
+                        this._deckCount === this._maxDeckCards - 1 && this.emit("DeckUnready"); // Emit event when deck is unready
 
                         this.updateSelectableCards();
                     }
