@@ -51,6 +51,47 @@ canvas {
   text-align: center;
 }
 
+#confirm-deck {
+  position: absolute;
+  bottom: 5px;
+  z-index: 10;
+  padding: 10px 20px;
+  background-color: #ff3333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+#confirm-deck:hover {
+  background-color: #666;
+  pointer-events: auto;
+  transform: scale(1.1);
+  transition: transform 0.2s ease-out;
+}
+
+#confirm-deck:not(:hover) {
+  background-color: #ff3333;
+  pointer-events: auto;
+  transform: scale(1);
+  transition: transform 0.2s ease-out;
+}
+
+#confirm-deck:active {
+  background-color: #888;
+  pointer-events: auto;
+  transform: scale(1);
+  transition: transform 0.2s ease-out;
+}
+
+#confirm-deck:disabled {
+  background-color: #444;
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 @media screen and (orientation: portrait) {
   #rotateMessage {
     display: flex;
@@ -69,30 +110,4 @@ canvas {
   #pixi-container {
     display: flex;
   }
-}
-
-#confirm-deck {
-  position: absolute;
-  bottom: 5px;
-  z-index: 10;
-  padding: 10px 20px;
-  background-color: #ff3333;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-#confirm-deck:hover {
-  background-color: #666;
-}
-
-#confirm-deck:active {
-  background-color: #888;
-}
-
-#confirm-deck:disabled {
-  background-color: #444;
-  cursor: not-allowed;
 }

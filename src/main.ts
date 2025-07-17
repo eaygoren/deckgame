@@ -18,7 +18,7 @@ const app = new Application();
   (globalThis as any).__PIXI_APP__ = app;
 
   document.getElementById("pixi-container")?.appendChild(app.canvas);
-  
+
   // Update scale function to fit the game area
   function updateScale() {
     const scaleX = window.innerWidth / 1920;
@@ -32,18 +32,27 @@ const app = new Application();
       (window.innerHeight - 1080 * scale) / 2
     );
   }
-  
+
   window.addEventListener("resize", updateScale);
   updateScale();
 
   const playerDeck = new DeckView(app);
 
-  const confirmDeckButton = document.getElementById("confirm-deck");
+  const confirmDeckButton = document.getElementById("confirm-deck") as HTMLButtonElement;
+  confirmDeckButton.disabled = true; // Initially disable the button
+
+  playerDeck.on("DeckReady", () => {
+    confirmDeckButton.disabled = false;
+  });
+  playerDeck.on("DeckUnready", () => {
+    confirmDeckButton.disabled = true;
+  });
 
   confirmDeckButton?.addEventListener("click", () => {
     confirmDeckButton.style.display = "none"; // Hide the button after confirming the deck
     console.log("Deck confirmed:", playerDeck.getDeckCards());
     // Start the game
     new Game(app, playerDeck.getDeckCards()).start();
+    playerDeck.destroy(); // Destroy the deck view after starting the game
   });
 })();
