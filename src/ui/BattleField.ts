@@ -2,6 +2,7 @@ import { Container, ContainerChild, IRenderLayer, Sprite, Text } from "pixi.js";
 
 export class BattleField extends Container {
     private static instance: BattleField;
+    private _background!: Sprite;
     private _playerField!: Container;
     private _botField!: Container;
     private _battleLog!: Container;
@@ -20,7 +21,13 @@ export class BattleField extends Container {
     }
 
     public showDeckCounts(playerCount: number, botCount: number) {
-        // Player indicators
+        if (!this._background) {
+            this._background = Sprite.from("battlefield");
+            this._background.anchor.set(0.5, 0.5);
+            this._background.scale.set(1.65, 1.65);
+            this._background.position.set(960, 550);
+            this.addChild(this._background);
+        }
         if (!this._playerField) {
             this._playerField = new Container({ label: "PlayerField" });
             this.addChild(this._playerField);

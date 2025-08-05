@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
-import { Card, LeaderCard } from "../game/Card";
-import { AttackType, ClassType, Color, UnitType } from "../shared/enums";
+import { Card } from "../game/Card";
+import { AttackType, ClassType, UnitType } from "../shared/enums";
 import { EFFECT_FILTERS, Environment } from "../shared/constants/gameConfig";
 import { AdjustmentFilter } from "pixi-filters";
 import { EffectType } from "../shared/interfaces/skillInterfaces";

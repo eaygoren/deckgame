@@ -1,11 +1,14 @@
 body {
   margin: 0;
   padding: 0;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #000000;
   min-height: 100vh;
   min-width: 100vw;
   overflow: hidden;
+  position: relative;
+  background-image: url("/public/tile.png");
+  background-repeat: repeat;
+  background-size: 500px 500px;
+  background-position: 0 0;
 }
 
 #app {
@@ -18,12 +21,15 @@ body {
 }
 
 #pixi-container {
+  background: transparent !important;
   width: 100vw;
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 canvas {
@@ -62,6 +68,7 @@ canvas {
   border-radius: 8px;
   font-size: 16px;
   cursor: pointer;
+  z-index: 3;
 }
 
 #confirm-deck:hover {
