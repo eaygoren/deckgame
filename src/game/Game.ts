@@ -4,8 +4,7 @@ import { Deck } from "./Deck";
 import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
-import { MoveOption } from "../shared/interfaces";
-import { AttackType, ClassType, Rarity, Turn, UnitType } from "../shared/enums";
+import { ClassType, Rarity, Turn, UnitType } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
@@ -14,6 +13,7 @@ import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
 import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
+import { BotAI } from "./BotAI";
 
 export class Game {
   private _app: Application;
@@ -21,6 +21,7 @@ export class Game {
   private _battlefield: BattleField;
   private _combatManager: CombatManager;
   private _animationManager: AnimationManager;
+  private _botAI: BotAI;
   private _player: Player;
   private _bot: Player;
   private _playerCardViews: CardView[] = [];
@@ -36,6 +37,7 @@ export class Game {
     this._app.stage.addChild(this._battlefield);
     this._combatManager = CombatManager.getInstance();
     this._animationManager = AnimationManager.getInstance();
+    this._botAI = BotAI.getInstance();
     // create players
     this._player = this.createPlayer(playerDeck);
     this._bot = this.createBot();
@@ -446,7 +448,7 @@ export class Game {
     if (availableTargetViews.length === 0) return;
 
     // Bot her zaman bir hamle yapar - en iyi hamleyi bul
-    const bestMove = this.findBestMove(this._botCardViews, availableTargetViews);
+    const bestMove = this._botAI.findBestMove(this._botCardViews, availableTargetViews);
 
     if (!bestMove) {
       //console.error("Bot could not find any move! This should not happen.");
@@ -482,153 +484,6 @@ export class Game {
         }
       }, 500);
     }
-  }
-
-  private calculateMoveScore(attacker: Card, defender: Card): number {
-    // LİDER KORUMASI: Lider kartı ölecekse saldırıyı reddet
-    const counterDamage = this._combatManager.calculateCounterDamage(defender);
-    const attackerTakesCounterDamage = attacker.attackType === AttackType.Melee;
-    const attackerWillDie = attackerTakesCounterDamage ? attacker.health <= counterDamage : false;
-
-    if (attacker.unitType === UnitType.Leader && attackerWillDie) {
-      return -10000; // Çok düşük skor ver, asla seçilmesin
-    }
-
-    // Gerçek hasar hesaplaması (class abilities dahil)
-    let attackDamage = attacker.attack;
-
-    // Rogue crit chance simulation (%25 şans 2x hasar)
-    if (attacker.classType === ClassType.Rogue) {
-      attackDamage = Math.floor(attackDamage * 1.25); // Ortalama hasar (25% şans için)
-    }
-
-    // Tank defense (ranged'a karşı %50 azaltma)
-    if (defender.classType === ClassType.Tank && attacker.attackType === AttackType.Ranged) {
-      attackDamage = Math.floor(attackDamage * 0.5);
-    }
-
-    const attackerSurvives = attackerTakesCounterDamage ? attacker.health > counterDamage : true;
-    const defenderDies = defender.health <= attackDamage;
-    const damageDealt = Math.min(attackDamage, defender.health);
-
-    let score = 0;
-    let moveType = "unknown";
-
-    // 1. ÖNCELİK: Düşman kartını öldür, ölme (mükemmel)
-    if (attackerSurvives && defenderDies) {
-      score = 10000 + (defender.attack * 200) + (defender.health * 50);
-      moveType = "Kill without dying";
-
-      // Ranged attack bonusu (counter damage yok)
-      if (attacker.attackType === AttackType.Ranged) {
-        score += 3000; // Ranged'a büyük bonus
-      }
-
-      // En yüksek attack'lı hedefi öldürmek için bonus
-      score += (defender.attack * 100);
-
-      // Class bonusları
-      if (attacker.classType === ClassType.Rogue) {
-        score += 800; // Crit şansı var
-      }
-      if (attacker.classType === ClassType.Mage) {
-        score += 1200; // Area damage potansiyeli
-      }
-    }
-
-    // 2. ÖNCELİK: Trading (düşman kartını öldür, ama sen de öl)
-    else if (!attackerSurvives && defenderDies) {
-      score = 5000 + (defender.attack * 150) + (defender.health * 30);
-      moveType = "Trading";
-
-      // Düşük değerli saldırgan ile trading yapılırsa bonus
-      if (attacker.health <= 2) {
-        score += 1500; // Düşük can kartı ile trade
-      }
-      if (attacker.attack <= 3) {
-        score += 1000; // Düşük attack kartı ile trade
-      }
-
-      // Melee mage bonus (ölecek ama area damage verecek)
-      if (attacker.classType === ClassType.Mage && attacker.attackType === AttackType.Melee) {
-        score += 2000; // Mage area damage çok değerli
-      }
-
-      // Yüksek attack'lı hedefi trade etmek için ekstra bonus
-      if (defender.attack >= 6) {
-        score += 1200;
-      }
-    }
-
-    // 3. ÖNCELİK: Öleceksin ama öldüremeyeceksin - maksimum hasar ver veya en değersiz kartı kullan
-    else if (!attackerSurvives && !defenderDies) {
-      score = 1000 + (damageDealt * 50);
-      moveType = "Sacrifice for damage";
-
-      // En değersiz kartı kullanma bonusu
-      if (attacker.health <= 2 && attacker.attack <= 3) {
-        score += 800; // En değersiz kart
-      }
-
-      // Melee mage bonusu (area damage verecek)
-      if (attacker.classType === ClassType.Mage && attacker.attackType === AttackType.Melee) {
-        score += 1500; // Area damage değerli
-      }
-
-      // Maksimum hasar bonus
-      score += (damageDealt * 20);
-    }
-
-    // 4. ÖNCELİK: Güvenli hasar (hiç kimse ölmüyor)
-    else if (attackerSurvives && !defenderDies) {
-      score = 100 + (damageDealt * 10);
-      moveType = "Safe damage";
-
-      // Ranged bonus (güvenli hasar)
-      if (attacker.attackType === AttackType.Ranged) {
-        score += 300;
-      }
-
-      // Rogue bonus (crit şansı)
-      if (attacker.classType === ClassType.Rogue) {
-        score += 200;
-      }
-    }
-
-    //console.log(`Move: ${attacker.Name}(${attacker.Attack}/${attacker.Health}) -> ${defender.Name}(${defender.Attack}/${defender.Health}) | Type: ${moveType} | Score: ${score} | Damage: ${attackDamage} | Counter: ${attacker.AttackType === AttackType.Ranged ? 0 : counterDamage} | Survives: ${attackerSurvives} | Defender Dies: ${defenderDies}`);
-
-    return score;
-  }
-
-  private findBestMove(attackers: CardView[], defenders: CardView[]): { attacker: Card; defender: Card } | null {
-    const moves: MoveOption[] = [];
-
-    // Tüm olası hamleleri değerlendir
-    for (const attackerView of attackers) {
-      for (const defenderView of defenders) {
-        const score = this.calculateMoveScore(attackerView.card, defenderView.card);
-
-        moves.push({
-          attacker: attackerView.card,
-          defender: defenderView.card,
-          score
-        });
-      }
-    }
-
-    // Eğer hiç hamle yoksa null döndür
-    if (moves.length === 0) return null;
-
-    // En yüksek skora sahip hamleyi seç
-    moves.sort((a, b) => b.score - a.score);
-    const bestMove = moves[0];
-
-    //console.log(`Best move selected: ${bestMove.attacker.Name} -> ${bestMove.defender.Name} (Score: ${bestMove.score})`);
-
-    return {
-      attacker: bestMove.attacker,
-      defender: bestMove.defender
-    };
   }
 
   // Effect damage - sadece belirli owner'ın effect'leri çalışır
@@ -814,7 +669,7 @@ export class Game {
       this._animationManager.stopAllAnimations();
       const restart = confirm("Bot Kazandı! Yeni oyun başlatmak ister misiniz?");
       if (restart) {
-        this.restartGame();
+        window.location.reload(); // Sayfayı yeniden yükle
       }
       return;
     }
@@ -824,7 +679,7 @@ export class Game {
       this._animationManager.stopAllAnimations();
       const restart = confirm("Oyuncu Kazandı! Yeni oyun başlatmak ister misiniz?");
       if (restart) {
-        this.restartGame();
+        window.location.reload(); // Sayfayı yeniden yükle
       }
       return;
     }
@@ -834,37 +689,6 @@ export class Game {
     // Interaction'ı yeniden kur
     this.resetInteraction();
     this.setupInteraction();
-  }
-
-  private restartGame() {
-    // Oyun yeniden başlarken tüm animasyonları durdur
-    this._animationManager.stopAllAnimations();
-
-    // Tüm mevcut kart görsellerini temizle
-    this._playerCardViews.forEach(view => view.destroy({ children: true }));
-    this._botCardViews.forEach(view => view.destroy({ children: true }));
-    this._playerCardViews = [];
-    this._botCardViews = [];
-
-    // Seçimleri sıfırla
-    this._attacker = null;
-    this._defender = null;
-
-    // Her zaman oyuncu ile başla - Bu çok önemli!
-    this._turn = Turn.Player;
-
-    // Yeni oyuncular oluştur (yeni kartlarla)
-    // this._player = this.createPlayer("Player");
-    this._bot = this.createBot();
-
-    // Oyunu yeniden başlat
-    this.renderHands();
-    this.setupInteraction();
-
-    // Ekstra güvenlik: Turn'ü tekrar kontrol et
-    if (this._turn !== Turn.Player) {
-      this._turn = Turn.Player;
-    }
   }
 
   private onCardsRemoved(data: any) {

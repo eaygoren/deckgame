@@ -1,7 +1,7 @@
-import { Card, LeaderCard } from "../game/Card";
+import { Card } from "../game/Card";
 import { CharacterList } from "../shared/constants/characters";
 import { BroadcastEvents } from "../shared/constants/events";
-import { AttackType, ClassType } from "../shared/enums";
+import { AttackType, ClassType, UnitType } from "../shared/enums";
 import { CombatOption } from "../shared/interfaces";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { CardView } from "../ui/CardView";
@@ -219,7 +219,7 @@ export class CombatManager {
 
     private getRandomOpponentTarget(opponentCardViews: CardView[]): Card | null {
         // Get all non-leader cards (we don't want to exclude originalTarget since it's not in opponent hand)
-        const availableTargets = opponentCardViews.map(view => view.card).filter(card => !(card instanceof LeaderCard) && card.health > 0);
+        const availableTargets = opponentCardViews.map(view => view.card).filter(card => !(card.unitType === UnitType.Leader) && card.health > 0);
 
         if (availableTargets.length === 0) return null;
 
@@ -232,7 +232,7 @@ export class CombatManager {
         const critChance = Math.random();
 
         // Critical Strike: 25% chance to deal double damage
-        if (critChance <= 0.95) {
+        if (critChance <= 0.25) {
             //console.log(`${attacker.card.Name} landed a critical strike!`);
             const critDamage = Math.floor(attacker.card.attack * 2);
 

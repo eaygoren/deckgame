@@ -9,6 +9,7 @@ export const CARD_POSITIONS = [
 ];
 
 export const Environment = {
+    battlefield: "battlefield",
     crown: "crown",
     deck: "deck",
     melee: "melee",
