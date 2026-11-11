@@ -1,10 +1,11 @@
 import { Turn } from "../shared/enums";
 import { BroadcastEvents } from "../shared/constants/events";
 import { Broadcast } from "../utils/Broadcast";
-import { battleCardMeta, CardView } from "./CardView";
+import { CardView } from "./CardView";
+import { cardTraitNames } from "./cardTraits";
 import { Card } from "../game/Card";
 import { Player } from "../game/Player";
-import { createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
+import { clockIconPath, createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 
 export class BattleField {
   private readonly playerRow = document.querySelector<HTMLElement>("#player-cards")!;
@@ -67,16 +68,16 @@ export class BattleField {
   }
 
   private showCardDetails(card: Card): void {
-    this.details.querySelector("#battle-detail-title")!.textContent = card.name;
-    this.details.querySelector("#battle-detail-meta")!.textContent = battleCardMeta(card).join(" · ");
-    this.details.querySelector("#battle-detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
-    this.details.querySelector("#battle-detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
     this.detailCard = card;
     this.renderCardStatus(card);
     this.details.showModal();
   }
 
   private renderCardStatus(card: Card): void {
+    this.details.querySelector("#battle-detail-title")!.textContent = card.name;
+    this.details.querySelector("#battle-detail-meta")!.textContent = cardTraitNames(card).join(" · ");
+    this.details.querySelector("#battle-detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
+    this.details.querySelector("#battle-detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
     this.details.querySelector("#battle-detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
     this.details.querySelector("#battle-detail-health")!.textContent = `♥ Can ${Math.max(0, card.health)}`;
     const fallen = card.health <= 0;
@@ -92,9 +93,19 @@ export class BattleField {
       const title = document.createElement("strong");
       title.textContent = badge?.label ?? effect.type;
       const details = document.createElement("small");
-      details.textContent = [effectDuration(effect), effectDetails(effect)].filter(Boolean).join(" · ");
+      details.textContent = effectDetails(effect);
       text.append(title, details);
-      entry.append(icon, text);
+
+      const duration = document.createElement("span");
+      duration.className = "battle-effect-duration";
+      const clock = createEffectBadge({ label: "Saat", path: clockIconPath });
+      clock.classList.add("effect-clock");
+      clock.setAttribute("aria-hidden", "true");
+      const remaining = document.createElement("span");
+      remaining.textContent = effect.duration === Infinity ? "∞" : String(effect.duration);
+      duration.title = effectDuration(effect);
+      duration.append(clock, remaining);
+      entry.append(icon, text, duration);
       return entry;
     });
     this.details.querySelector("#battle-detail-effects")!.replaceChildren(...entries);

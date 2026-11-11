@@ -16,11 +16,27 @@ export class GenericSkill extends BaseSkill {
     public get name(): string { return this.config.name; }
     public get description(): string { return this.config.description; }
     public get triggerTiming(): SkillTiming { return this.config.triggerTiming; }
+    public get persistsAfterDeath(): boolean { return this.config.persistsAfterDeath ?? false; }
+    public get exhausted(): boolean { return this.hasBeenUsed; }
 
-    public canUse(caster: Card): boolean {
+    public freshCopy(): GenericSkill {
+        return new GenericSkill(this.config);
+    }
+
+    public copyForSimulation(): GenericSkill {
+        const copy = this.freshCopy();
+        copy.hasBeenUsed = this.hasBeenUsed;
+        return copy;
+    }
+
+    public passiveEffect(type: EffectType): EffectConfig | undefined {
+        if (this.triggerTiming !== SkillTiming.Passive) return undefined;
+        return this.config.effects.find(effect => effect.type === type);
+    }
+
+    public canUse(caster: Card, _target?: Card, context?: CombatContext): boolean {
         // Once kontrolü
         if (this.config.once && this.hasBeenUsed) {
-            console.log("Skill has already been used");
             return false;
         }
 
@@ -30,7 +46,7 @@ export class GenericSkill extends BaseSkill {
         }
 
         // Şans kontrolü
-        if (this.config.chance && Math.random() > this.config.chance) {
+        if (this.config.chance && (context?.random ?? Math.random)() > this.config.chance) {
             return false;
         }
 
@@ -55,27 +71,37 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyEffect(effectConfig: EffectConfig, caster: Card, target?: Card, context?: CombatContext): SkillResult {
+        if (context?.dodged && effectConfig.target === TargetType.Enemy) return { success: false };
         const targetCard = this.resolveTarget(effectConfig, caster, target, context);
 
-        // Sadece Enemy target'larda null kontrolü yap
-        if (!targetCard && (effectConfig.target === TargetType.Enemy || effectConfig.target === TargetType.RandomEnemy)) {
+        if (!targetCard && effectConfig.target !== TargetType.None) {
             return { success: false, message: "No valid target found" };
         }
 
-        // Self target'lar için targetCard yerine caster kullan
         const actualTarget = targetCard || caster;
 
         switch (effectConfig.type) {
+            case EffectType.Invisible:
+                return this.applyStatus(actualTarget, effectConfig, (effectConfig.duration ?? 1) + (context?.isCounterAttack ? 0 : 1));
+            case EffectType.Taunt:
+                return this.applyStatus(actualTarget, effectConfig, effectConfig.duration ?? 1, caster);
             case EffectType.Silence:
                 return this.applySilence(actualTarget, effectConfig);
             case EffectType.Zombify:
                 return this.applyZombify(actualTarget, effectConfig);
             case EffectType.Heal:
-                return this.applyHeal(actualTarget, effectConfig, context);
+                return this.applyHeal(caster, actualTarget, effectConfig);
+            case EffectType.Cleanse:
+                actualTarget.cleanseNegativeEffects();
+                return { success: true, message: `${actualTarget.name}'s negative effects were removed!` };
+            case EffectType.VoidLock:
+                if (actualTarget.health <= 0) return { success: false };
+                actualTarget.removeStatBuffs();
+                return this.applyStatus(actualTarget, effectConfig, Infinity);
             case EffectType.Buff:
                 return this.applyBuff(actualTarget, effectConfig);
             case EffectType.LifeSteal:
-                return this.applyLifeSteal(actualTarget, effectConfig, context);
+                return this.applyHeal(caster, actualTarget, effectConfig);
             case EffectType.Burn:
                 return this.applyBurn(actualTarget, effectConfig);
             case EffectType.AttackReduction:
@@ -87,7 +113,7 @@ export class GenericSkill extends BaseSkill {
             case EffectType.Poison:
                 return this.applyPoison(actualTarget, effectConfig);
             case EffectType.Mark:
-                return this.applyMark(actualTarget, effectConfig);
+                return this.applyMark(caster, actualTarget, effectConfig);
             case EffectType.AttackCopy:
                 return this.applyAttackCopy(caster, target);
             case EffectType.StatSwap:
@@ -114,9 +140,9 @@ export class GenericSkill extends BaseSkill {
 
         if (targetName && Object.values(CharacterList).some(character => character.name === targetName)) {
             if (context?.player?.team.includes(caster)) {
-                return context.player.team.find(card => card.name === targetName) || null;
+                return context.player.team.find(card => card.name === targetName && card.health > 0) || null;
             } else if (context?.opponent?.team.includes(caster)) {
-                return context?.opponent?.team.find(card => card.name === targetName) || null;
+                return context?.opponent?.team.find(card => card.name === targetName && card.health > 0) || null;
             }
         }
 
@@ -126,18 +152,22 @@ export class GenericSkill extends BaseSkill {
             case TargetType.Enemy:
                 return target || null;
             case TargetType.LowestHpAlly:
-                return this.findLowestHpAlly(context?.allPlayerCards);
+                return this.findLowestHpAlly(context?.allPlayerCards?.filter(card => !effectConfig.excludeCaster || card !== caster));
             case TargetType.RandomAlly: {
                 const allies = context?.allPlayerCards;
+                if (effectConfig.type === EffectType.Cleanse) {
+                    const affectedAllies = allies?.filter(ally => ally.health > 0 && ally.hasNegativeEffects) ?? [];
+                    return affectedAllies[Math.floor((context?.random ?? Math.random)() * affectedAllies.length)] ?? null;
+                }
                 const eligibleAllies = effectConfig.type === EffectType.Protection
                     ? allies?.filter(ally => ally.unitType !== UnitType.Leader)
                     : allies;
-                return this.findRandomAlly(caster, eligibleAllies);
+                return this.findRandomAlly(caster, eligibleAllies, context?.random);
             }
             case TargetType.RandomEnemy:
-                return this.findRandomEnemy(context?.allOpponentCards);
+                return this.findRandomEnemy(context?.allOpponentCards, context?.random);
             case TargetType.RandomDeadAlly:
-                return this.findRandomDeadAlly(context?.player);
+                return this.findRandomDeadAlly(context?.player, context?.random);
             case TargetType.None:
                 return effectConfig.type === EffectType.SummonAlly && effectConfig.summon ? effectConfig.summon as Card : null;
             default:
@@ -146,6 +176,12 @@ export class GenericSkill extends BaseSkill {
     }
 
     // Effect implementation metodları
+    private applyStatus(target: Card, config: EffectConfig, duration: number, source?: Card): SkillResult {
+        const effect = { type: config.type, target, duration, source };
+        target.addEffect(effect);
+        return { success: true, message: this.name, additionalEffects: [effect] };
+    }
+
     private applySilence(target: Card, config: EffectConfig): SkillResult {
         const effect: SkillEffect = {
             type: EffectType.Silence,
@@ -172,16 +208,13 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyZombify(target: Card, config: EffectConfig): SkillResult {
-        // Zaten zombie ise effect uygulanmaz
-        if (target.hasEffect?.(EffectType.Zombify)) {
-            return {
-                success: false,
-                message: `${target.name} is already a zombie!`
-            };
+        if (target.unitType === UnitType.Leader || target.name === CharacterList.Zombie.name
+            || target.isZombified || target.hasEffect(EffectType.ZombifyPending)) {
+            return { success: false };
         }
 
         const effect: SkillEffect = {
-            type: EffectType.Zombify,
+            type: EffectType.ZombifyPending,
             target: target,
             duration: config.duration || 1
         };
@@ -192,31 +225,33 @@ export class GenericSkill extends BaseSkill {
 
         return {
             success: true,
-            message: `${target.name} has been zombified!`,
+            message: `${target.name} will turn into a zombie!`,
             additionalEffects: [effect]
         };
     }
 
-    private applyHeal(target: Card, config: EffectConfig, context?: CombatContext): SkillResult {
-        const healAmount = Math.floor((context?.damage || 1) * (config.value || 0.5));
-
-        if (target.health !== undefined) {
-            target.health = Math.min(target.health + healAmount, target.maxHealth || target.health + healAmount);
-        }
+    private applyHeal(caster: Card, target: Card, config: EffectConfig): SkillResult {
+        if (target.blocksStatRecovery) return { success: false };
+        const healAmount = config.useCasterAttack
+            ? Math.floor(caster.attack * (config.value ?? 1))
+            : config.value ?? 1;
+        const missingHealth = Math.max(0, target.maxHealth - target.health);
+        const restoredHealth = config.allowOverheal ? healAmount : Math.min(healAmount, missingHealth);
+        target.health += restoredHealth;
 
         return {
             success: true,
-            message: `${target.name} healed for ${healAmount} HP!`
+            message: `${target.name} healed for ${restoredHealth} HP!`
         };
     }
 
     private applyBuff(target: Card, config: EffectConfig): SkillResult {
+        if (target.blocksStatRecovery) return { success: false };
         const buffAmount = config.value || 1;
 
         if (target.attack !== undefined && target.health !== undefined) {
-            target.attack += buffAmount;
-            target.health += buffAmount;
-            target.maxHealth += buffAmount;
+            target.increaseAttack(buffAmount);
+            target.increaseHealth(buffAmount);
         }
 
         return {
@@ -225,24 +260,12 @@ export class GenericSkill extends BaseSkill {
         };
     }
 
-    private applyLifeSteal(target: Card, config: EffectConfig, context?: CombatContext): SkillResult {
-        const healAmount = Math.floor((context?.damage || 1) * (config.value || 0.5));
-
-        if (target.health !== undefined) {
-            target.health = Math.min(target.health + healAmount, target.maxHealth || target.health + healAmount);
-        }
-
-        return {
-            success: true,
-            message: `${target.name} steals ${healAmount} HP!`
-        };
-    }
-
     private applyBurn(target: Card, config: EffectConfig): SkillResult {
         const effect: SkillEffect = {
             type: EffectType.Burn,
             target: target,
-            duration: config.duration || 1
+            duration: config.duration || 1,
+            value: config.value ?? 1
         };
 
         if (target.addEffect) {
@@ -279,11 +302,6 @@ export class GenericSkill extends BaseSkill {
                 }
             } else {
                 target.addEffect(effect);
-
-                // Attack'ı azalt - null check ekleyin
-                const reductionValue = effect.value || 0.5; // Güvenli değer
-                const reductionAmount = Math.floor(target.attack * reductionValue);
-                target.attack = Math.max(1, target.attack - reductionAmount); // Minimum 1 attack
             }
         }
 
@@ -346,6 +364,8 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyPoison(target: Card, config: EffectConfig): SkillResult {
+        if (target.hasEffect(EffectType.Poison)) return { success: false };
+
         const effect: SkillEffect = {
             type: EffectType.Poison,
             target: target,
@@ -353,11 +373,7 @@ export class GenericSkill extends BaseSkill {
             value: config.value
         };
 
-        if (target.addEffect) {
-            if (!target.hasEffect(EffectType.Poison)) {
-                target.addEffect(effect);
-            }
-        }
+        target.addEffect(effect);
 
         return {
             success: true,
@@ -366,24 +382,16 @@ export class GenericSkill extends BaseSkill {
         };
     }
 
-    private applyMark(target: Card, config: EffectConfig): SkillResult {
+    private applyMark(caster: Card, target: Card, config: EffectConfig): SkillResult {
         const effect: SkillEffect = {
             type: EffectType.Mark,
-            target: target,
-            duration: config.duration || 1,
+            target,
+            source: caster,
+            duration: (config.duration ?? 1) + 1,
             value: config.value || 1.5
         };
 
-        if (target.addEffect) {
-            if (target.hasEffect(EffectType.Mark) && target.activeEffects) {
-                const markEffect = target.activeEffects.find(effect => effect.type === EffectType.Mark);
-                if (markEffect && typeof markEffect.duration === "number") {
-                    markEffect.duration++;
-                }
-            } else {
-                target.addEffect(effect);
-            }
-        }
+        target.addEffect(effect);
 
         return {
             success: true,
@@ -397,8 +405,8 @@ export class GenericSkill extends BaseSkill {
             return { success: false };
         }
 
-        if (target.attack > caster.attack) {
-            caster.attack = target.attack;
+        if (!caster.blocksStatRecovery && target.attack > caster.unreducedAttack) {
+            caster.increaseAttack(target.attack - caster.unreducedAttack);
 
             return {
                 success: true,
@@ -417,8 +425,9 @@ export class GenericSkill extends BaseSkill {
         const oldAttack = target.attack;
         const oldHealth = target.health;
 
-        target.attack = oldHealth;
+        target.setDisplayedAttack(oldHealth);
         target.health = oldAttack;
+        target.maxHealth = Math.max(target.maxHealth, target.health);
 
         return {
             success: true,
@@ -477,6 +486,7 @@ export class GenericSkill extends BaseSkill {
 
         player.deck.addCard(target);
         target.health = 1;
+        target.resetTurnSkillUsage();
         return {
             success: true,
             message: `${target.name} has been revived and added to the deck!`

@@ -33,15 +33,15 @@ export abstract class BaseSkill implements ISkill {
         );
     }
 
-    protected findRandomAlly(caster: Card, allAllies?: Card[]): Card | null {
+    protected findRandomAlly(caster: Card, allAllies?: Card[], random = Math.random): Card | null {
         const allies = allAllies?.filter(card => card !== caster && card.health > 0) || [];
 
         if (allies.length === 0) return null;
 
-        return allies[Math.floor(Math.random() * allies.length)];
+        return allies[Math.floor(random() * allies.length)];
     }
 
-    protected findRandomDeadAlly(player?: Player): Card | null {
+    protected findRandomDeadAlly(player?: Player, random = Math.random): Card | null {
         if (!player) return null;
         const deadAllies = player.team.filter(card =>
             card.health <= 0 && card !== player.leader &&
@@ -50,16 +50,16 @@ export abstract class BaseSkill implements ISkill {
 
         if (deadAllies.length === 0) return null;
 
-        const randomDeadAlly = deadAllies[Math.floor(Math.random() * deadAllies.length)];
+        const randomDeadAlly = deadAllies[Math.floor(random() * deadAllies.length)];
 
         return randomDeadAlly;
     }
 
-    protected findRandomEnemy(allEnemies?: Card[]): Card | null {
+    protected findRandomEnemy(allEnemies?: Card[], random = Math.random): Card | null {
         const enemies = allEnemies?.filter(card => card.health > 0) || [];
 
         if (enemies.length === 0) return null;
 
-        return enemies[Math.floor(Math.random() * enemies.length)];
+        return enemies[Math.floor(random() * enemies.length)];
     }
 }

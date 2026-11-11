@@ -4,15 +4,103 @@ import { MoveOption } from "../shared/interfaces";
 import { CardView } from "../ui/CardView";
 import { Card } from "./Card";
 
-export class BotAI {
-    constructor(private readonly _combatManager: CombatManager) {}
+export interface BattleMove {
+    attacker: Card;
+    defender: Card;
+}
 
-    public findBestMove(attackers: CardView[], defenders: CardView[]): { attacker: Card; defender: Card } | null {
+export interface BattlePosition {
+    fork(seed: number, hideEnemyDeck?: boolean): BattlePosition;
+    moves(): BattleMove[];
+    play(move: BattleMove | undefined): Promise<void>;
+    score(): number;
+    finished(): boolean;
+    leaderAtRisk(): boolean;
+    replyPriority(move: BattleMove): number;
+}
+
+export class BotAI {
+    constructor(
+        private readonly _combatManager: CombatManager,
+        private readonly adaptiveSampling = true,
+    ) {}
+
+    public async plan(position: BattlePosition, seed: number): Promise<BattleMove | null> {
+        const moves = position.moves();
+        if (moves.length <= 1) return moves[0] ?? null;
+
+        // Common random samples make candidate moves comparable.
+        const seeds = [0x139f93a1, 0x52fb2d13, 0xcfa12659].map(salt => seed ^ salt);
+        const candidates = [];
+        for (const move of moves) {
+            const outcomes = [];
+            for (const seed of seeds) {
+                const sample = position.fork(seed, true);
+                await sample.play(move);
+                outcomes.push(sample);
+            }
+            const score = outcomes.reduce((sum, outcome) => sum + outcome.score(), 0) / seeds.length;
+            candidates.push({ move, outcomes, score });
+        }
+        candidates.sort((left, right) => right.score - left.score);
+        const finalists = candidates.slice(0, 3);
+        // Two points are roughly one reserve card in the board evaluation.
+        const close = finalists[0].score - finalists[1].score <= 2;
+        const leaderRisk = this.adaptiveSampling && (
+            position.leaderAtRisk() ||
+            finalists.some(candidate => candidate.outcomes.some(outcome =>
+                outcome.finished() || outcome.leaderAtRisk()))
+        );
+        if (this.adaptiveSampling && (close || leaderRisk)) {
+            const extraSeeds = [0x381fc715, 0xa66c713b, 0x946bdaef, 0x06dcbef9, 0xf72348ab]
+                .map(salt => seed ^ salt);
+            seeds.push(...extraSeeds);
+            for (const candidate of finalists) {
+                for (const sampleSeed of extraSeeds) {
+                    const sample = position.fork(sampleSeed, true);
+                    await sample.play(candidate.move);
+                    candidate.outcomes.push(sample);
+                }
+                candidate.score = candidate.outcomes.reduce((sum, outcome) => sum + outcome.score(), 0) / seeds.length;
+            }
+        }
+
+        let best = candidates[0].move;
+        let bestScore = -Infinity;
+        for (const candidate of finalists) {
+            let replyScore = 0;
+            for (const [index, outcome] of candidate.outcomes.entries()) {
+                if (outcome.finished()) {
+                    replyScore += outcome.score();
+                    continue;
+                }
+
+                const replies = outcome.moves().sort((left, right) =>
+                    outcome.replyPriority(right) - outcome.replyPriority(left)).slice(0, 2);
+                let worstScore = Infinity;
+                for (const reply of replies.length ? replies : [undefined]) {
+                    const response = outcome.fork(seeds[index] ^ 0x6d2b79f5);
+                    await response.play(reply);
+                    worstScore = Math.min(worstScore, response.score());
+                }
+                replyScore += worstScore;
+            }
+            const score = 0.3 * candidate.score + 0.7 * replyScore / seeds.length;
+            if (score > bestScore) {
+                best = candidate.move;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    public findBestMove(attackers: CardView[], defenders: CardView[], canTarget: (attacker: Card, target: Card) => boolean): { attacker: Card; defender: Card } | null {
         const moves: MoveOption[] = [];
 
         // Tüm olası hamleleri değerlendir
         for (const attackerView of attackers) {
             for (const defenderView of defenders) {
+                if (!canTarget(attackerView.card, defenderView.card)) continue;
                 const score = this.calculateMoveScore(attackerView.card, defenderView.card);
 
                 moves.push({
@@ -38,9 +126,11 @@ export class BotAI {
         };
     }
 
-    private calculateMoveScore(attacker: Card, defender: Card): number {
+    public calculateMoveScore(attacker: Card, defender: Card): number {
         // LİDER KORUMASI: Lider kartı ölecekse saldırıyı reddet
-        const counterDamage = this._combatManager.calculateCounterDamage(defender);
+        const preview = this._combatManager.previewCombat(attacker, defender);
+        const counterDamage = Math.floor((preview.counter + (preview.counterCritical === null ? 0 :
+            (preview.counterCritical - preview.counter) * preview.counterCritChance)) * (1 - preview.counterDodgeChance));
         const attackerTakesCounterDamage = attacker.attackType === AttackType.Melee;
         const attackerWillDie = attackerTakesCounterDamage ? attacker.health <= counterDamage : false;
 
@@ -48,18 +138,8 @@ export class BotAI {
             return -10000; // Çok düşük skor ver, asla seçilmesin
         }
 
-        // Gerçek hasar hesaplaması (class abilities dahil)
-        let attackDamage = attacker.attack;
-
-        // Rogue crit chance simulation (%25 şans 2x hasar)
-        if (attacker.classType === ClassType.Rogue) {
-            attackDamage = Math.floor(attackDamage * 1.25); // Ortalama hasar (25% şans için)
-        }
-
-        // Tank defense (ranged'a karşı %50 azaltma)
-        if (defender.classType === ClassType.Tank && attacker.attackType === AttackType.Ranged) {
-            attackDamage = Math.floor(attackDamage * 0.5);
-        }
+        const attackDamage = Math.floor((preview.normal + (preview.critical === null ? 0 :
+            (preview.critical - preview.normal) * preview.critChance)) * (1 - preview.dodgeChance));
 
         const attackerSurvives = attackerTakesCounterDamage ? attacker.health > counterDamage : true;
         const defenderDies = defender.health <= attackDamage;

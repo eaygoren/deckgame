@@ -18,7 +18,7 @@ export const TankAbility: IAbility = {
 
 export const WarriorAbility: IAbility = {
     name: "Berserker Rage",
-    description: "Permanently gain 50% more attack when health drops below 50%."
+    description: "A warrior fights fiercest when death draws near. Once per match, permanently gains 50% attack at turn end if HP is at or below half starting HP."
 };
 
 export const ClassAbilities = {

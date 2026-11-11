@@ -2,66 +2,66 @@ import { AttackType, ClassType, Color, Rarity, UnitType } from "../enums";
 import { AvailabilityType, CharacterListType } from "../interfaces";
 
 export const Characters = {
-    Aerwyn: "Aerwyn", // %25 ihtimalle saldırılardan kaçınır
-    Alien: "Alien", // hasar aldıktan sonra 1 tur görünmez olur, görünmezken rakipler counter saldırı yapamaz
-    Archangel: "Archangel", // saldırı yaptığı tur sonrası, takımındaki en düşük canı olan kartı, verdiği hasarın %50'si kadar iyileştirir
+    Aerwyn: "Aerwyn", // %25 ihtimalle saldırıdan kaçar ve menzilli karşı saldırı yapar. Elf'in Delici Atış'ı kaçınmayı aşar.
+    Alien: "Alien", // Hasar alıp hayatta kalırsa sonraki rakip turunun sonuna kadar görünmez olur ve karşı hasar almaz. Son normal kartsa veya yanında yalnızca aktif Luxen ve lider varken rakip sadece menzilli saldırabiliyorsa hedef alınabilir.
+    Archangel: "Archangel", // Saldırı sonrası kendisi hariç en düşük mevcut cana sahip müttefiki, kendi mevcut saldırısının yarısı kadar iyileştirir. Karşı saldırıda ölse de çalışır.
     Archmage: "Archmage",
-    Assassin: "Assassin", // kritik ihtimalini 2 katına çıkarır, %25 ihtimalle counter saldırı ile kritik hasar verebilir
+    Assassin: "Assassin", // Normal saldırıda %50, yakın dövüş karşı saldırısında %25 kritik şansına sahiptir.
     Banshee: "Banshee",
     Cerberus: "Cerberus",
     Cyborg: "Cyborg", // saldırmadığı her tur, saldırı gücünü kalıcı olarak 1 artırır //TODO
     Cyclop: "Cyclop",
     Deathknight: "Deathknight", // dost birim öldüğünde desteye 1 adet skeleton ekler //TODO
-    Dragon: "Dragon", // hasar verdiği rakipleri 1 tur yakar, yanan rakipler 1 tur boyunca %50 saldırı gücü kaybeder
+    Dragon: "Dragon", // Saldırı sonrası hedefi 1 hasarlık yakar ve hedefin saldırısını 1 tur boyunca %50 düşürür.
     // Dwarf: "Dwarf",
-    Elf: "Elf", // tüm hasar düşürme etkilerini yok sayar
-    Ent: "Ent", // saldırdığı rakibi, bir tur boyunca sadece Ent'e saldırabilir
-    Ganesha: "Ganesha", // her tur, takımındaki negatif etkileri kaldırır //TODO
+    Elf: "Elf", // Saldırıları kaçınmayı, hasar azaltmayı ve hasar paylaşımını aşar.
+    Ent: "Ent", // Saldırı sonrası yalnızca vurduğu rakip 1 tur boyunca ancak Ent'e saldırabilir.
+    Ganesha: "Ganesha", // Sahada bir rakip turu geçirdikten sonra kendi turunun başında, diğer tur başı yeteneklerinden önce, rastgele bir yaşayan müttefikin tüm negatif etkilerini temizler. Kendisi ve lider seçilebilir. Enfeksiyonu temizler, tamamlanan zombileşmeyi geri almaz.
     Gargoyle: "Gargoyle", // saldırmadığı her tur sonrası 1 tur boyunca taşlaşır ve 2 saldırı gücü kazanır, taşlaştığı tur saldırı yapamaz //TODO
-    Ghost: "Ghost", // öldüğünde Reaper'a 1 can verir
-    Gunslinger: "Gunslinger", // saldırdığı rakip işaretlenir, işaretli rakip 1 tur boyunca %50 daha fazla hasar alır
+    Ghost: "Ghost", // Öldüğünde yaşayan müttefik Reaper'a maksimum canı aşabilen 1 can verir.
+    Gunslinger: "Gunslinger", // Saldırı sonrası hedefi işaretler. Hedef, işaretleyenin sonraki kendi turunun sonuna kadar normal saldırılardan %50 fazla hasar alır.
     Hathor: "Hathor", // takımındaki Ra ile birlikte saldırır //TODO
-    Herbalist: "Herbalist", // her tur, takımındaki en düşük canı olan kartın canını 1 yeniler
+    Herbalist: "Herbalist", // Sahada bir rakip turu geçirdikten sonra kendi turunun başında en düşük mevcut cana sahip müttefike 1 can verir.
     Hunter: "Hunter",
     Hydra: "Hydra", // 3 kez olmak üzere, öldüğünde %50 can ve saldırı gücü ile yeniden doğar ve her doğuşunda ekstradan rastgele 1 rakibe daha saldırı yapacak şekilde kesilen baş için yerine 2 yeni baş ekler //TODO
-    Illusionist: "Illusionist", // oyun başına bir kez olmak üzere, rakibin canı ile saldırı gücünü değiştirir
-    Joker: "Joker", // saldırdığı rakibin hasarı kendi hasarından yüksekse, rakibin hasarını kendi hasarına eşitler
-    Knight: "Knight", // her turun başında 1 takım arkadaşını korur, koruduğu kart hasarın yarısını alır ve hasarın diğer yarısını kendisi alır //TODO
-    Lich: "Lich", // saldırdığı rakibi 1 tur dondurur, donan kart bir 1 tur saldırı ve counter saldırı yapamaz, passive skill kullanılabilir
-    Luxen: "Luxen", // oyunda olduğu sürece, rakip ranged kartların saldırı yapmasını engeller //TODO
+    Illusionist: "Illusionist", // Maçta bir kez, saldırı öncesinde hedefin görünen saldırısını ve mevcut canını takas eder.
+    Joker: "Joker", // Saldırı öncesinde hedefin saldırısı daha yüksekse kendi saldırısını kalıcı olarak o değere yükseltir.
+    Knight: "Knight", // Kendi turunun başında rastgele başka bir lider olmayan müttefiki, sonraki kendi turunun başına kadar korur. Gelen hasarın yarısına kadarını kalan canı ölçüsünde üstlenir. Kalan hasarı asıl hedef alır.
+    Lich: "Lich", // Saldırı ve karşı saldırı hasarı çözüldükten sonra hedefi 1 tur dondurur. Donmuş kart saldıramaz ve karşı saldırı yapamaz.
+    Luxen: "Luxen", // Pasifi aktifken menzilli rakipler onu hedefleyemez. Susturulursa veya son normal kartken ona saldırabilecek yakın dövüşçü yoksa hedef alınabilir.
     // Medusa: "Medusa",
-    Mimic: "Mimic", // saldırdığı rakibin skillini kopyalar, kopyalanan skill 1 tur boyunca kullanılabilir ve 1 tur sonra kaybolur //TODO
+    Mimic: "Mimic", // İsabet eden normal saldırıda hedefin saldırı öncesi, saldırı sonrası veya öldürmede çalışan yeteneğini kopyalar. Kopya sonraki kendi turundaki normal saldırıda koşulu sağlanınca çalışır ve kullanıldığında ya da tur sonunda silinir.
     // Minotaur: "Minotaur",
     Monk: "Monk",
     // Mummy: "Mummy",
     // Naga: "Naga",
-    Necromancer: "Necromancer", // oyun boyunca bir kez olmak üzere, ölen bir takım arkadaşını yeniden diriltir //TODO
-    Ninja: "Ninja", // saldırdığı turda kritik vurma durumunda, kritik hasarı 3 katına çıkarır //TODO
-    Phoenix: "Phoenix", // yumurta formuna geçer, 1 tur sonra yeniden doğar, yumurta formundayken saldırı yapamaz //TODO
+    Necromancer: "Necromancer", // Bir rakibi öldürdüğünde, maçta bir kez, rastgele ölü bir müttefiki 1 canla desteye geri koyar ve o kartın tur bazlı yetenek kullanımını sıfırlar.
+    Ninja: "Ninja", // İsabet eden her kritik vuruştan sonra aynı hamlede aynı hedefe yeniden saldırır. Normal vuruşta, kaçınmada veya hedef düşünce zincir biter.
+    Phoenix: "Phoenix", // Maçta bir kez, ölümcül hasar alınca hedeflenebilen bir yumurtaya dönüşür. Yumurta saldıramaz ve karşı saldırı yapamaz. Kendi takımının ikinci turunun sonunda hayattaysa Phoenix yeniden doğar.
     // Pirate: "Pirate",
     Ra: "Ra", // takımındaki Hathor ile birlikte saldırır //TODO
-    Reaper: "Reaper", // rakip öldürdüğünde takımının destesine hayalet ekler
+    Reaper: "Reaper", // Bir rakibi öldürdüğünde kendi destesine Ghost ekler.
     Reikist: "Reikist", // her tur, rasgele bir takım arkadaşının 1 tur boyunca saldırı gücünü 2 artırır //TODO
-    Samurai: "Samurai", // rakibi 2 tur kanatır, kanayan rakip bir sonraki tur 1 hasar alır
+    Samurai: "Samurai", // Saldırı sonrası hedefi 2 tur boyunca tur başına 1 hasar verecek şekilde kanatır.
     // Scarecrow: "Scarecrow", // saldıran rakibini korkutur, korkutulan rakibin saldırı gücü 1 tur boyunca 0 olur
-    Scorpion: "Scorpion", // saldırdığı rakibi zehirler, zehirli rakip her tur 1 hasar alır
-    Shaman: "Shaman", // saldırdığı her tur rasgele bir takım arkadaşının canını ve saldırı gücünü 1 artırır
-    Siren: "Siren", // rakibi susturur, susturulan kart bir 1 tur boyunca skill kullanamaz
+    Scorpion: "Scorpion", // Saldırı sonrası hedefi kalıcı olarak zehirler. Karşı saldırıda ölse de çalışır. Zehir her tur 1 hasar verir ve aktifken tekrar uygulanamaz.
+    Shaman: "Shaman", // Saldırı sonrası rastgele başka bir müttefike kalıcı +1 mevcut can, +1 maksimum can ve +1 saldırı verir.
+    Siren: "Siren", // Saldırı sonrası hedefi 1 tur susturur ve özel yeteneğini kullanmasını engeller.
     Skeleton: "Skeleton",
-    Vampire: "Vampire", // saldırdığı rakibe verdiği hasarın %50'si kadarını can çalar
-    Void: "Void", // saldırdığı rakipler, eksik saldırı ve can değerlerini yenileyemez //TODO
+    Vampire: "Vampire", // Saldırıdan sağ çıkarsa kendi mevcut saldırısının yarısı kadar can yeniler.
+    Void: "Void", // İsabet eden saldırı sonrası hayatta kalan hedefin stat güçlendirmelerini kaldırır. Etki temizlenene kadar hedef can yenileyemez veya yeni stat güçlendirmesi alamaz.
     Werewolf: "Werewolf",
-    Wukong: "Wukong", // hem tank hem de warrior özelliklerini taşır //TODO
+    Wukong: "Wukong", // Tank ve Warrior sınıf yeteneklerinin ikisini de taşır.
     Zeus: "Zeus", // saldırdığı rakip ve leader dışındaki tüm kartlara 1 hasar verir //TODO
-    Zombie: "Zombie" //rakibi 1 tur zombie yapar, zombie olan kart 1 tur boyunca ability kullanamaz
+    Zombie: "Zombie" // Saldırı sonrası hedefi enfekte eder. Hedef iki kendi turu sonra temel Zombie'nin yarı saldırısı ve yarı canıyla kalıcı olarak zombileşir. Dönüşüm kart ve sınıf yeteneklerini kapatır. Liderler ve Zombieler bağışıktır.
 };
 
 export const CharacterList: CharacterListType = {
     Aerwyn: {
         name: Characters.Aerwyn,
         cover: Characters.Aerwyn.toLowerCase(),
-        attack: 6,
-        health: 8,
+        attack: 4,
+        health: 6,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
@@ -73,7 +73,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Alien,
         cover: Characters.Alien.toLowerCase(),
         attack: 4,
-        health: 5,
+        health: 7,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
@@ -108,8 +108,8 @@ export const CharacterList: CharacterListType = {
     Assassin: {
         name: Characters.Assassin,
         cover: Characters.Assassin.toLowerCase(),
-        attack: 8,
-        health: 5,
+        attack: 7,
+        health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
@@ -180,8 +180,8 @@ export const CharacterList: CharacterListType = {
     Dragon: {
         name: Characters.Dragon,
         cover: Characters.Dragon.toLowerCase(),
-        attack: 7,
-        health: 4,
+        attack: 3,
+        health: 11,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
@@ -217,7 +217,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Ganesha,
         cover: Characters.Ganesha.toLowerCase(),
         attack: 4,
-        health: 9,
+        health: 12,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
@@ -252,7 +252,7 @@ export const CharacterList: CharacterListType = {
     Gunslinger: {
         name: Characters.Gunslinger,
         cover: Characters.Gunslinger.toLowerCase(),
-        attack: 8,
+        attack: 6,
         health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
@@ -312,7 +312,7 @@ export const CharacterList: CharacterListType = {
     Illusionist: {
         name: Characters.Illusionist,
         cover: Characters.Illusionist.toLowerCase(),
-        attack: 6,
+        attack: 5,
         health: 7,
         rarity: Rarity.Common,
         color: Color.Common,
@@ -396,7 +396,7 @@ export const CharacterList: CharacterListType = {
     Necromancer: {
         name: Characters.Necromancer,
         cover: Characters.Necromancer.toLowerCase(),
-        attack: 4,
+        attack: 5,
         health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
@@ -408,8 +408,8 @@ export const CharacterList: CharacterListType = {
     Ninja: {
         name: Characters.Ninja,
         cover: Characters.Ninja.toLowerCase(),
-        attack: 7,
-        health: 5,
+        attack: 6,
+        health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
@@ -420,8 +420,8 @@ export const CharacterList: CharacterListType = {
     Phoenix: {
         name: Characters.Phoenix,
         cover: Characters.Phoenix.toLowerCase(),
-        attack: 6,
-        health: 8,
+        attack: 5,
+        health: 7,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
@@ -445,7 +445,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Reaper,
         cover: Characters.Reaper.toLowerCase(),
         attack: 9,
-        health: 6,
+        health: 7,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
@@ -468,8 +468,8 @@ export const CharacterList: CharacterListType = {
     Samurai: {
         name: Characters.Samurai,
         cover: Characters.Samurai.toLowerCase(),
-        attack: 8,
-        health: 9,
+        attack: 7,
+        health: 8,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
@@ -528,7 +528,7 @@ export const CharacterList: CharacterListType = {
     Vampire: {
         name: Characters.Vampire,
         cover: Characters.Vampire.toLowerCase(),
-        attack: 8,
+        attack: 7,
         health: 7,
         rarity: Rarity.Common,
         color: Color.Common,
@@ -540,7 +540,7 @@ export const CharacterList: CharacterListType = {
     Void: {
         name: Characters.Void,
         cover: Characters.Void.toLowerCase(),
-        attack: 4,
+        attack: 5,
         health: 6,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
@@ -564,8 +564,8 @@ export const CharacterList: CharacterListType = {
     Wukong: {
         name: Characters.Wukong,
         cover: Characters.Wukong.toLowerCase(),
-        attack: 8,
-        health: 9,
+        attack: 7,
+        health: 8,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,
@@ -576,8 +576,8 @@ export const CharacterList: CharacterListType = {
     Zeus: {
         name: Characters.Zeus,
         cover: Characters.Zeus.toLowerCase(),
-        attack: 9,
-        health: 8,
+        attack: 5,
+        health: 7,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,

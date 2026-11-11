@@ -40,6 +40,7 @@ export interface CombatOption {
   defender: CardView;
   attackDamage: number;
   counterDamage: number;
+  followUp: boolean;
 }
 
 export enum AvailabilityType {

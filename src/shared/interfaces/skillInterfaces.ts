@@ -6,7 +6,9 @@ export interface ISkill {
     name: string;
     description: string;
     triggerTiming: SkillTiming;
+    persistsAfterDeath?: boolean;
     target?: Card;
+    passiveEffect?(type: EffectType): EffectConfig | undefined;
     canUse(caster: Card, target?: Card, context?: CombatContext): boolean;
     execute(caster: Card, target?: Card, context?: CombatContext): SkillResult;
 }
@@ -23,9 +25,11 @@ export enum SkillTiming {
 }
 
 export interface CombatContext {
+    random?: () => number;
     attacker?: Card;
     defender?: Card | null; // Eğer defender null ise, bu skill sadece attacker üzerinde çalışır
     damage?: number;
+    dodged?: boolean;
     isCounterAttack?: boolean;
     allPlayerCards?: Card[];
     allOpponentCards?: Card[];
@@ -45,14 +49,17 @@ export interface SkillEffect {
     type: EffectType;
     target: any;
     protector?: Card;
+    source?: Card;
     duration: number;
     value?: number;
     owner?: "player" | "bot";
     coverChange?: string; // YENİ: Effect cover'ı belirlemek için
+    copiedSkill?: ISkill;
 }
 
 export enum EffectType {
     Silence = "silence",
+    ZombifyPending = "zombify_pending",
     Zombify = "zombify",
     Invisible = "invisible",
     Burn = "burn",
@@ -62,16 +69,24 @@ export enum EffectType {
     Mark = "mark",
     Dodge = "dodge",
     Heal = "heal",
+    Cleanse = "cleanse",
+    VoidLock = "void_lock",
     Buff = "buff",
     LifeSteal = "life_steal",
     CritBoost = "crit_boost",
+    IronWall = "iron_wall",
     AttackReduction = "attack_reduction",
     IgnoreDefense = "ignore_defense",
+    RangedTargetImmunity = "ranged_target_immunity",
     Taunt = "taunt",
     StatSwap = "stat_swap",
     AttackCopy = "attack_copy",
+    SkillCopy = "skill_copy",
+    CriticalFollowUp = "critical_follow_up",
     Protection = "protection",
     WarriorRage = "warrior_rage",
+    PhoenixRebirth = "phoenix_rebirth",
+    PhoenixEgg = "phoenix_egg",
     SummonAlly = "summon_ally",
     SummonDeadAlly = "summon_dead_ally"
 }
@@ -94,14 +109,19 @@ export interface SkillConfig {
     triggerTiming: SkillTiming;
     effects: EffectConfig[];
     once?: boolean;
+    persistsAfterDeath?: boolean;
     chance?: number;
 }
 
 export interface EffectConfig {
+    counterOnDodge?: boolean;
     type: EffectType;
     target?: TargetType | ICard;
     duration?: number;
     value?: number;
     chance?: number;
     summon?: ICard;
+    useCasterAttack?: boolean;
+    excludeCaster?: boolean;
+    allowOverheal?: boolean;
 }

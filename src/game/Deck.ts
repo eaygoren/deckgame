@@ -34,11 +34,11 @@ export class Deck {
     return hand;
   }
 
-  public drawRandomCard(): Card | null {
+  public drawRandomCard(random: () => number = Math.random): Card | null {
     // Draw a random card from the deck, excluding the leader
     const available = this._cards.filter((c) => c !== this._leader);
     if (available.length === 0) return null;
-    const idx = Math.floor(Math.random() * available.length);
+    const idx = Math.floor(random() * available.length);
     const card = available[idx];
     // Remove the card from the deck
     this._cards = this._cards.filter((c) => c !== card);

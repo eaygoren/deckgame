@@ -11,8 +11,14 @@ import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
 import { Environment } from "../shared/constants/gameConfig";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
-import { BotAI } from "./BotAI";
+import { BattleMove, BattlePosition, BotAI } from "./BotAI";
+import { cloneBattleState, seededBattleRandom } from "./BattleSnapshot";
 import { AvailabilityType } from "../shared/interfaces";
+
+export type MatchOutcome = "win" | "loss" | "draw";
+
+const reserveCandidates = Object.values(CharacterList).filter(card =>
+  card.availabilityType === AvailabilityType.Playable && card.unitType === UnitType.Regular);
 
 export class Game {
   private _broadcast: Broadcast;
@@ -24,16 +30,18 @@ export class Game {
   private _bot: Player;
   private _playerCardViews: CardView[] = [];
   private _botCardViews: CardView[] = [];
+  private readonly cardsReadyForTurnStartSkill = new WeakSet<CardView>();
   private _attacker: CardView | null = null;
   private _turn: Turn = Turn.Player;
   private _phase: "ready" | "attacking" | "resolving" | "finished" = "ready";
   private stopped = false;
+  private simulation = false;
   private botTimer?: ReturnType<typeof setTimeout>;
   private readonly turnHint = document.getElementById("battle-hint")!;
   private readonly preview = document.querySelector<HTMLElement>("#battle-preview")!;
   private previewTarget: CardView | null = null;
 
-  constructor(playerDeck: Deck, private readonly onMatchEnded: (won: boolean) => void) {
+  constructor(playerDeck: Deck, private readonly onMatchEnded: (outcome: MatchOutcome) => void) {
     this._broadcast = new Broadcast();
     this._battlefield = new BattleField(this._broadcast);
     this._combatManager = new CombatManager(this._broadcast);
@@ -196,6 +204,10 @@ export class Game {
   }
 
   private mountCard(card: Card, side: Turn, slot: number): CardView {
+    if (this.simulation) {
+      // Simulation views only supply the card and slot to the shared turn resolver.
+      return { card, slot, element: { isConnected: false }, updateStats() {}, updateCover() {} } as CardView;
+    }
     const view = new CardView(card, slot);
     this._battlefield.addCard(view, side);
     if (side === Turn.Player) {
@@ -228,9 +240,8 @@ export class Game {
     return view;
   }
 
-  private canTarget(card: Card, opponent: Player): boolean {
-    return card.health > 0 && (card.unitType !== UnitType.Leader
-      || !opponent.hand.some(ally => ally.health > 0 && ally.unitType !== UnitType.Leader));
+  private canTarget(card: Card, opponent: Player, attacker = this._attacker?.card ?? null): boolean {
+    return this._combatManager.canAttackTarget(attacker, card, opponent.hand);
   }
 
   private clearDamagePreview(): void {
@@ -265,10 +276,14 @@ export class Game {
     if (!this.canTarget(target.card, this._bot)) return;
 
     const attacker = this._attacker.card;
-    const { normal, critical, counter } = this._combatManager.previewCombat(attacker, target.card);
+    const { normal, critical, counter, counterCritical, critChance, counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter } = this._combatManager.previewCombat(attacker, target.card);
     const parts = [target.card.name + " · Hasar " + normal];
-    if (critical !== null) parts.push("Kritik " + critical);
+    if (critical !== null) parts.push(`Kritik ${critical} (%${critChance * 100})`);
+    if (dodgeChance > 0) parts.push(`Hedefin kaçınma şansı %${dodgeChance * 100}`);
+    if (dodgeCounter !== null) parts.push(`Kaçınırsa menzilli karşı hasar ${dodgeCounter}`);
     parts.push("Karşı hasar " + counter);
+    if (counterCritical !== null) parts.push(`Karşı kritik ${counterCritical} (%${counterCritChance * 100})`);
+    if (counterDodgeChance > 0) parts.push(`Kaçınma şansı %${counterDodgeChance * 100}`);
     if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("Yetenek değerleri değiştirebilir");
     if (confirmWithTap) parts.push("Saldırmak için tekrar dokun");
     this.clearDamagePreview();
@@ -281,6 +296,7 @@ export class Game {
   }
 
   private updateBattleHud(): void {
+    if (this.simulation) return;
     this.clearDamagePreview();
     const playerTurn = this._turn === Turn.Player;
     const choosingTarget = playerTurn && this._phase === "ready" && this._attacker !== null;
@@ -292,7 +308,7 @@ export class Game {
     const ready = playerTurn && this._phase === "ready";
     this._battlefield.setActiveSide(this._phase === "finished" ? null : this._turn);
     for (const view of this._playerCardViews) {
-      const frozen = view.card.hasEffect(EffectType.Freeze);
+      const frozen = view.card.isPhoenixEgg || view.card.hasEffect(EffectType.Freeze);
       const state = view === this._attacker && choosingTarget ? "attacker" : frozen ? "frozen" : "idle";
       view.setState(state, ready && !frozen);
     }
@@ -303,7 +319,7 @@ export class Game {
   }
 
   private handlePlayerCardClick(view: CardView): void {
-    if (this._turn !== Turn.Player || this._phase !== "ready" || view.card.hasEffect(EffectType.Freeze)) return;
+    if (this._turn !== Turn.Player || this._phase !== "ready" || view.card.isPhoenixEgg || view.card.hasEffect(EffectType.Freeze)) return;
     this._attacker = this._attacker === view ? null : view;
     this.updateBattleHud();
   }
@@ -318,28 +334,171 @@ export class Game {
     void this.attack(this._attacker, view, this._botCardViews);
   }
 
-  private botTurn(): void {
+  private async botTurn(): Promise<void> {
     if (this._turn !== Turn.Bot || this._phase !== "ready") return;
-    const attackers = this._botCardViews.filter(view => !view.card.hasEffect(EffectType.Freeze));
-    const targets = this._playerCardViews.filter(view => this.canTarget(view.card, this._player));
-    const move = this._botAI.findBestMove(attackers, targets);
+    const move = await this.planBotMove();
+    if (this.stopped || this._turn !== Turn.Bot || this._phase !== "ready") return;
+    const attackers = this._botCardViews;
+    const targets = this._playerCardViews;
     const attacker = attackers.find(view => view.card === move?.attacker);
     const defender = targets.find(view => view.card === move?.defender);
     if (attacker && defender) void this.attack(attacker, defender, this._playerCardViews);
   }
 
+  public planBotMove(): Promise<BattleMove | null> {
+    // Derive samples from public state without advancing the live combat RNG.
+    const visibleCards = [...this._player.hand, ...this._bot.hand];
+    const seed = visibleCards.reduce((hash, card) => {
+      const key = `${card.name}/${card.attack}/${card.health}/${card.activeEffects.length}`;
+      for (let index = 0; index < key.length; index++) {
+        hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+      }
+      return hash;
+    }, 2166136261);
+    return this._botAI.plan(this.battlePosition(this._turn), seed);
+  }
+
+  private battlePosition(perspective: Turn, copies?: Map<object, object>): BattlePosition {
+    const active = () => this._turn === Turn.Player ? this._playerCardViews : this._botCardViews;
+    const waiting = () => this._turn === Turn.Player ? this._botCardViews : this._playerCardViews;
+    return {
+      fork: (seed, hideEnemyDeck) => this.forkBattle(perspective, seed, Boolean(hideEnemyDeck)),
+      moves: () => {
+        const moves: BattleMove[] = [];
+        const opponent = this._turn === Turn.Player ? this._bot : this._player;
+        for (const { card: attacker } of active()) {
+          for (const { card: defender } of waiting()) {
+            if (attacker.health > 0 && this.canTarget(defender, opponent, attacker)) moves.push({ attacker, defender });
+          }
+        }
+        return moves;
+      },
+      play: async move => {
+        if (!move) {
+          this._phase = "attacking";
+          await this.onTurnCompleted();
+          return;
+        }
+        const attacker = active().find(view => view.card === copies?.get(move.attacker))!;
+        const defender = waiting().find(view => view.card === copies?.get(move.defender))!;
+        await this.attack(attacker, defender, waiting());
+      },
+      score: () => {
+        const score = this.scoreTeam(this._player) - this.scoreTeam(this._bot);
+        return perspective === Turn.Player ? score : -score;
+      },
+      finished: () => this._phase === "finished",
+      leaderAtRisk: () => {
+        const opponent = this._turn === Turn.Player ? this._bot : this._player;
+        for (const { card: attacker } of active()) {
+          for (const { card: defender } of waiting()) {
+            if (attacker.health <= 0 ||
+                (attacker.unitType !== UnitType.Leader && defender.unitType !== UnitType.Leader) ||
+                !this.canTarget(defender, opponent, attacker)) continue;
+            if (defender.unitType === UnitType.Leader) return true;
+            const preview = this._combatManager.previewCombat(attacker, defender);
+            if (Math.max(preview.counter, preview.counterCritical ?? 0, preview.dodgeCounter ?? 0) >= attacker.health) {
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      replyPriority: ({ attacker, defender }) => {
+        const preview = this._combatManager.previewCombat(attacker, defender);
+        const lethal = preview.normal >= defender.health || (preview.critical ?? 0) >= defender.health;
+        const priority = lethal && defender.unitType === UnitType.Leader ? 20000 : 0;
+        return priority + this._botAI.calculateMoveScore(attacker, defender);
+      },
+    };
+  }
+
+  private forkBattle(perspective: Turn, seed: number, hideEnemyDeck: boolean): BattlePosition {
+    const copies = new Map<object, object>();
+    const broadcast = new Broadcast();
+    const combat = new CombatManager(broadcast, seededBattleRandom(seed));
+    const fork: Game = Object.create(Game.prototype);
+    Object.assign(fork, {
+      simulation: true,
+      _phase: this._phase,
+      _turn: this._turn,
+      _broadcast: broadcast,
+      _combatManager: combat,
+      _botAI: new BotAI(combat),
+      _battlefield: { updateCardPanels() {} },
+      _animationManager: { async playAttack() {}, async removeCards() {}, showNewCard() {} },
+      cardsReadyForTurnStartSkill: new WeakSet<CardView>(),
+      onMatchEnded() {},
+    });
+    fork._player = cloneBattleState(this._player, copies);
+    fork._bot = cloneBattleState(this._bot, copies);
+    if (hideEnemyDeck) {
+      const enemy = perspective === Turn.Player ? fork._bot : fork._player;
+      fork.sampleEnemyReserve(enemy, seededBattleRandom(seed ^ 0x2b84d6d1));
+    }
+
+    const copyViews = (views: CardView[], side: Turn) => views.map(view => {
+      const copy = fork.mountCard(cloneBattleState(view.card, copies), side, view.slot);
+      if (this.cardsReadyForTurnStartSkill.has(view)) fork.cardsReadyForTurnStartSkill.add(copy);
+      return copy;
+    });
+    fork._playerCardViews = copyViews(this._playerCardViews, Turn.Player);
+    fork._botCardViews = copyViews(this._botCardViews, Turn.Bot);
+    combat.player = fork._turn === Turn.Player ? fork._player : fork._bot;
+    combat.opponent = fork._turn === Turn.Player ? fork._bot : fork._player;
+    return fork.battlePosition(perspective, copies);
+  }
+
+  private sampleEnemyReserve(enemy: Player, random: () => number): void {
+    const count = enemy.deck.cards.length;
+    const known = enemy.team.filter(card => enemy.hand.includes(card) || card.health <= 0);
+    const knownNames = new Set(known.map(card => card.name));
+    const available = reserveCandidates.filter(card => !knownNames.has(card.name));
+    const reserve: Card[] = [];
+    for (let index = 0; index < count && available.length; index++) {
+      const [stats] = available.splice(Math.floor(random() * available.length), 1);
+      reserve.push(new Card(stats));
+    }
+    // Decks can exceed the deck builder limit after summons.
+    enemy.deck.cards.length = 0;
+    for (const card of reserve) enemy.deck.addCard(card);
+    enemy.team = [...known, ...reserve];
+  }
+
+  private scoreTeam(player: Player): number {
+    if (!player.hand.some(card => card.unitType === UnitType.Leader)) return -1000;
+    return player.deck.cards.length * 2 + player.hand.reduce((score, card) => {
+      if (card.unitType === UnitType.Leader) {
+        return score + 2 * card.health - 8 / Math.max(1, card.health);
+      }
+      const poison = card.activeEffects.reduce((damage, effect) =>
+        damage + ([EffectType.Bleed, EffectType.Burn, EffectType.Poison].includes(effect.type) ? (effect.value ?? 1) : 0), 0);
+      const condition = Number(card.hasEffect(EffectType.Freeze)) * 2
+        + Number(card.hasEffect(EffectType.ZombifyPending)) * 2
+        + Number(card.hasEffect(EffectType.VoidLock)) * 0.75
+        + Number(card.hasEffect(EffectType.Mark)) * 0.75;
+      const attack = card.isPhoenixEgg ? CharacterList.Phoenix.attack * 0.55 : card.attack;
+      return score + 5 + 0.75 * attack + 0.65 * Math.max(0, card.health - poison) - condition;
+    }, 0);
+  }
+
   private async attack(attacker: CardView, defender: CardView, opponents: CardView[]): Promise<void> {
     this._phase = "attacking";
     this.updateBattleHud();
-    const result = await this._combatManager.resolveCombat(attacker, defender);
-    if (this.stopped) return;
-    if (result) {
+    let followUp: boolean;
+    do {
+      const result = await this._combatManager.resolveCombat(attacker, defender);
+      if (this.stopped) return;
+      if (!result) break;
+
       const animation = this._animationManager.playAttack(result);
       if (attacker.card.classType === ClassType.Mage) {
         this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker, opponentCardViews: opponents });
       }
       await animation;
-    }
+      if (this.stopped) return;
+      followUp = result.followUp;
+    } while (followUp);
     await this.onTurnCompleted();
   }
 
@@ -351,7 +510,7 @@ export class Game {
       const previousHealth = card.health;
       switch (effect.type) {
         case EffectType.Bleed:
-          const bleedDamage = effect.value || 1;
+          const bleedDamage = effect.value ?? 1;
           card.health = Math.max(0, card.health - bleedDamage);
 
           const cardView = this.findCardView(card);
@@ -366,13 +525,8 @@ export class Game {
           });
           break;
         case EffectType.Burn:
-          const burnDamage = effect.value || 1;
+          const burnDamage = effect.value ?? 1;
           card.health = Math.max(0, card.health - burnDamage);
-
-          if (card.hasEffect(EffectType.WarriorRage)) {
-            const warriorRage = card.activeEffects.filter(e => e.type === EffectType.WarriorRage);
-            warriorRage.forEach(e => (e.duration = 0) && (e.value = undefined));
-          }
 
           const burnCardView = this.findCardView(card);
           if (burnCardView) {
@@ -386,7 +540,7 @@ export class Game {
           });
           break;
         case EffectType.Poison:
-          const poisonDamage = effect.value || 1;
+          const poisonDamage = effect.value ?? 1;
           card.health = Math.max(0, card.health - poisonDamage);
 
           const poisonCardView = this.findCardView(card);
@@ -401,7 +555,10 @@ export class Game {
           });
           break;
       }
-    };
+      if (card.health > 0 && card.health < previousHealth && card.skill?.triggerTiming === SkillTiming.OnDamageReceived) {
+        card.useSkill(undefined, { isCounterAttack: true, random: this._combatManager.random });
+      }
+    }
   }
 
   private findCardView(card: Card): CardView | null {
@@ -424,10 +581,17 @@ export class Game {
 
     this.triggerStartOfTurnSkills();
     for (const view of activeViews) {
-      void view.updateCover();
+      view.updateStats();
     }
 
-    if (activeViews.every(view => view.card.hasEffect(EffectType.Freeze))) {
+    if (this.simulation) {
+      this._phase = "ready";
+      return;
+    }
+
+    const opponent = this._turn === Turn.Player ? this._bot : this._player;
+    const hasMove = activeViews.some(({ card }) => opponent.hand.some(target => this.canTarget(target, opponent, card)));
+    if (!hasMove) {
       this._phase = "attacking";
       this.updateBattleHud();
       void this.onTurnCompleted();
@@ -446,9 +610,15 @@ export class Game {
     const player = isPlayerTurn ? this._player : this._bot;
     const opponent = isPlayerTurn ? this._bot : this._player;
 
-    activeCardViews.forEach(view => {
+    const ganeshas = activeCardViews.filter(view => view.card.name === CharacterList.Ganesha.name);
+    const otherCards = activeCardViews.filter(view => view.card.name !== CharacterList.Ganesha.name);
+    [...ganeshas, ...otherCards].forEach(view => {
+      const needsEnemyTurn = view.card.name === CharacterList.Herbalist.name
+        || view.card.name === CharacterList.Ganesha.name;
+      if (needsEnemyTurn && !this.cardsReadyForTurnStartSkill.has(view)) return;
       if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn && view.card.health > 0) {
         const context: CombatContext = {
+          random: this._combatManager.random,
           attacker: view.card,
           defender: null,
           damage: 0,
@@ -476,8 +646,10 @@ export class Game {
     const allDeadCards = [...this._playerCardViews, ...this._botCardViews].filter(view => view.card.health <= 0);
 
     allDeadCards.forEach(deadCardView => {
+      if (this._combatManager.tryPhoenixRebirth(deadCardView)) return;
       if (deadCardView.card.skill?.triggerTiming === SkillTiming.OnDeath) {
         const result = deadCardView.card.useSkill(deadCardView.card.skill.target, {
+          random: this._combatManager.random,
           player: this._player.team.includes(deadCardView.card) ? this._player : this._bot
         });
 
@@ -511,10 +683,26 @@ export class Game {
         break;
     }
 
+    const inactiveViews = this._turn === Turn.Player ? this._botCardViews : this._playerCardViews;
+    const activeTeam = (this._turn === Turn.Player ? this._player : this._bot).team;
+    for (const view of inactiveViews) {
+      view.card.tickMark(activeTeam);
+      view.card.tickInvisibility();
+      view.updateCover();
+    }
+
     for (const cardView of cardViews) {
       if (cardView.card.activeEffects) {
         await this.applyEffectDamage(cardView.card);
-        await cardView.card.updateEffects();
+        if (cardView.card.health > 0) {
+          const wasEgg = cardView.card.isPhoenixEgg;
+          await cardView.card.updateEffects();
+          if (wasEgg && !cardView.card.isPhoenixEgg && !cardView.card.isZombified) {
+            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+              targetView: cardView, abilityName: cardView.card.skill?.name, message: "Phoenix yeniden doğdu!", color: "#ff6600"
+            });
+          }
+        }
         await cardView.updateCover();
         cardView.updateStats();
       }
@@ -542,6 +730,12 @@ export class Game {
     }
     await this._animationManager.removeCards(fallen);
     if (this.stopped) return;
+    const waitingViews = this._turn === Turn.Player ? this._botCardViews : this._playerCardViews;
+    for (const view of waitingViews) {
+      if (view.card.health > 0) {
+        this.cardsReadyForTurnStartSkill.add(view);
+      }
+    }
     this._playerCardViews = this.replaceDeadCards(this._player, Turn.Player, this._playerCardViews, playerDead);
     this._botCardViews = this.replaceDeadCards(this._bot, Turn.Bot, this._botCardViews, botDead);
     this._battlefield.updateCardPanels(this._player, this._bot);
@@ -565,7 +759,7 @@ export class Game {
 
     this._phase = "finished";
     this.updateBattleHud();
-    this.onMatchEnded(playerAlive);
+    this.onMatchEnded(playerAlive ? "win" : botAlive ? "loss" : "draw");
     return true;
   }
 
@@ -573,7 +767,7 @@ export class Game {
     const survivors = views.filter(view => !dead.includes(view));
     player.hand = survivors.map(view => view.card);
     for (const view of dead) {
-      const card = player.deck.drawRandomCard();
+      const card = player.deck.drawRandomCard(this._combatManager.random);
       if (!card) break;
       player.hand.push(card);
       const replacement = this.mountCard(card, side, view.slot);

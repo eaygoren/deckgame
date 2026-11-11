@@ -1,8 +1,18 @@
 import { Effects, Environment } from "../shared/constants/gameConfig";
+import { CharacterList } from "../shared/constants/characters";
 import { Color, Rarity, AttackType, ClassType, UnitType } from "../shared/enums";
 import { ICard, ILeaderCard } from "../shared/interfaces";
-import { CombatContext, EffectType, ISkill, SkillEffect, SkillResult } from "../shared/interfaces/skillInterfaces";
+import { CombatContext, EffectType, ISkill, SkillEffect, SkillResult, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { SkillFactory } from "./skills/SkillFactory";
+import { GenericSkill } from "./skills/GenericSkill";
+
+// New skills are eligible by timing. Only timings resolved by a normal attack belong here.
+const copyableSkillTimings = new Set([SkillTiming.BeforeAttack, SkillTiming.AfterAttack, SkillTiming.OnKill]);
+const negativeEffects = new Set([
+  EffectType.Bleed, EffectType.Burn, EffectType.Poison, EffectType.Freeze,
+  EffectType.Silence, EffectType.AttackReduction, EffectType.Mark, EffectType.Taunt,
+  EffectType.ZombifyPending, EffectType.VoidLock,
+]);
 
 export class Card implements ICard {
   private static nextId = 0;
@@ -17,13 +27,17 @@ export class Card implements ICard {
   protected _classType: ClassType;
   protected _unitType: UnitType;
   protected _skill: ISkill | null = null;
+  private readonly copiedSkills = new Map<string, GenericSkill>();
   protected _activeEffects: SkillEffect[] = [];
   protected _skillUsedThisTurn: boolean = false;
   protected _initialAttack?: number; // Yeni özellik, başlangıç attack değerini saklamak için
-  protected _maxAttack?: number; // Orijinal attack değerini saklamak için
   protected _initialHealth?: number; // Yeni özellik, başlangıç canını saklamak için
   protected _maxHealth: number; // Başlangıç canını saklamak için
   protected _effectCover?: string;
+  private phoenixRebirthUsed = false;
+  private attackBonus = 0;
+  private maxHealthBonus = 0;
+  public warriorRageUsed = false;
 
   constructor(options: ICard) {
     this._id = Card.nextId++;
@@ -42,21 +56,82 @@ export class Card implements ICard {
     this._skill = SkillFactory.createSkill(this._name);
   }
 
+  public get isZombified(): boolean {
+    return this.hasEffect(EffectType.Zombify);
+  }
+
+  public get isPhoenixEgg(): boolean {
+    return this.hasEffect(EffectType.PhoenixEgg);
+  }
+
+  public tryEnterPhoenixEgg(): boolean {
+    if (this.health > 0 || this.phoenixRebirthUsed || !this.passiveEffect(EffectType.PhoenixRebirth)) return false;
+
+    this.phoenixRebirthUsed = true;
+    this.clearEffects();
+    this.removeStatBuffs();
+    this._cover = "phoenixegg";
+    this._attack = 0;
+    this._maxHealth = this._health = CharacterList.Phoenix.health;
+    this.addEffect({ type: EffectType.PhoenixEgg, target: this, duration: 2 });
+    return true;
+  }
+
+  private restorePhoenixForm(): void {
+    this.removeStatBuffs();
+    const phoenix = CharacterList.Phoenix;
+    this._cover = phoenix.cover;
+    this._attack = phoenix.attack;
+    this._maxHealth = phoenix.health;
+  }
+
+  public passiveEffect(type: EffectType) {
+    if (this.isZombified || this.hasEffect(EffectType.Silence)) return undefined;
+    return this.skill?.passiveEffect?.(type);
+  }
+
   // Skill kullanma
   public useSkill(target?: Card, context?: CombatContext): SkillResult | null {
-    if (!this._skill || this.hasEffect(EffectType.Silence) || this._skillUsedThisTurn) {
+    return this.executeSkill(this._skill, target, context);
+  }
+
+  public get readyCopiedSkill(): ISkill | undefined {
+    const copy = this._activeEffects.find(effect => effect.type === EffectType.SkillCopy);
+    return copy?.duration === 1 ? copy.copiedSkill : undefined;
+  }
+
+  public copySkillFrom(target: Card): ISkill | undefined {
+    const original = target.skill;
+    if (this.health <= 0 || !this.passiveEffect(EffectType.SkillCopy)
+      || this.hasEffect(EffectType.SkillCopy) || target.isZombified
+      || !(original instanceof GenericSkill) || !copyableSkillTimings.has(original.triggerTiming)) {
+      return undefined;
+    }
+
+    // Each Mimic owns its copies and remembers successful once-per-match uses.
+    const copy = this.copiedSkills.get(original.name) ?? original.freshCopy();
+    if (copy.exhausted) return undefined;
+    this.copiedSkills.set(original.name, copy);
+    this.addEffect({ type: EffectType.SkillCopy, target: this, duration: 2, copiedSkill: copy });
+    return copy;
+  }
+
+  public useCopiedSkill(target: Card, context: CombatContext): SkillResult | null {
+    const result = this.executeSkill(this.readyCopiedSkill, target, context);
+    if (result?.success) this.removeEffect(EffectType.SkillCopy);
+    return result;
+  }
+
+  private executeSkill(skill: ISkill | null | undefined, target?: Card, context?: CombatContext): SkillResult | null {
+    if (!skill || this.isZombified || this.hasEffect(EffectType.Silence) || this._skillUsedThisTurn) {
       return null;
     }
 
-    if (!this._skill.canUse(this, target, context)) {
+    if (!skill.canUse(this, target, context)) {
       return null;
     }
 
-    if (!target && this._skill.target) {
-      target = this._skill.target;
-    }
-
-    const result = this._skill.execute(this, target, context);
+    const result = skill.execute(this, target ?? skill.target, context);
     if (result.success) {
       this._skillUsedThisTurn = true;
     }
@@ -88,10 +163,6 @@ export class Card implements ICard {
       case EffectType.Zombify:
         this._effectCover = Effects.zombify;
         break;
-      case EffectType.AttackReduction:
-        if (!this._maxAttack) {
-          this._maxAttack = this._attack;
-        }
     }
   }
 
@@ -106,21 +177,45 @@ export class Card implements ICard {
     return this._activeEffects.some(e => e.type === effectType);
   }
 
+  public get hasNegativeEffects(): boolean {
+    return this._activeEffects.some(effect => negativeEffects.has(effect.type));
+  }
+
+  public cleanseNegativeEffects(): void {
+    this._activeEffects = this._activeEffects.filter(effect => !negativeEffects.has(effect.type));
+    const lastCoverEffect = this._activeEffects.filter(effect =>
+      effect.type === EffectType.Protection || effect.type === EffectType.Zombify).pop();
+    this._effectCover = lastCoverEffect?.type === EffectType.Protection ? Effects.protection
+      : lastCoverEffect ? Effects.zombify : undefined;
+  }
+
   public clearEffects(): void {
-    this._activeEffects = [];
+    if (this.isPhoenixEgg) this.restorePhoenixForm();
+    this._activeEffects = this._activeEffects.filter(effect => effect.type === EffectType.Zombify);
     this._effectCover = undefined;
   }
 
+  public resetTurnSkillUsage(): void {
+    this._skillUsedThisTurn = false;
+  }
+
   public async updateEffects(): Promise<void> {
+    let zombify = false;
+    const wasEgg = this.isPhoenixEgg;
     this._activeEffects = this._activeEffects.filter(effect => {
-      // Protection expires when its owner's next turn begins.
-      if (effect.type === EffectType.Protection) return true;
+      // These effects expire at separate turn boundaries.
+      if (effect.type === EffectType.Protection || effect.type === EffectType.Invisible || effect.type === EffectType.Mark) {
+        return true;
+      }
 
       effect.duration--;
 
       // Effect bittiğinde temizlik yap
       if (effect.duration <= 0) {
         switch (effect.type) {
+          case EffectType.ZombifyPending:
+            zombify = true;
+            break;
           case EffectType.Bleed:
             this.removeEffect(EffectType.Bleed);
             this._effectCover = undefined;
@@ -137,27 +232,41 @@ export class Card implements ICard {
             this.removeEffect(EffectType.Poison);
             this._effectCover = undefined;
             break;
-          case EffectType.Zombify:
-            this.removeEffect(EffectType.Zombify);
-            this._effectCover = undefined;
-            break;
           case EffectType.WarriorRage:
             this.removeEffect(EffectType.WarriorRage);
             break;
-        }
-
-        // Attack reduction bittiğinde attack'ı restore et
-        if (effect.type === EffectType.AttackReduction && this._maxAttack) {
-          this.removeEffect(EffectType.AttackReduction);
-          this._attack = this._maxAttack; // Original attack'a geri dön
-          this._maxAttack = undefined; // Temizle
         }
       }
 
       return effect.duration > 0;
     });
 
-    this._skillUsedThisTurn = false;
+    if (zombify) {
+      this.transformIntoZombie();
+    } else if (wasEgg && !this.isPhoenixEgg && this.health > 0) {
+      this.restorePhoenixForm();
+      this._health = this._maxHealth;
+      this.clearEffects();
+    }
+    this.resetTurnSkillUsage();
+  }
+
+  private transformIntoZombie(): void {
+    this.removeStatBuffs();
+    const zombie = CharacterList.Zombie;
+    this._name = zombie.name;
+    this._cover = zombie.cover;
+    this._classType = zombie.classType;
+    this._attackType = zombie.attackType;
+    this._unitType = zombie.unitType;
+    this._attack = Math.floor(zombie.attack / 2);
+    this._maxHealth = Math.floor(zombie.health / 2);
+    this._health = this._maxHealth;
+    this._skill = null;
+    this.removeEffect(EffectType.PhoenixEgg);
+    this.removeEffect(EffectType.SkillCopy);
+    this.removeEffect(EffectType.WarriorRage);
+    this.addEffect({ type: EffectType.Zombify, target: this, duration: Infinity });
   }
 
   public get id(): number {
@@ -177,11 +286,25 @@ export class Card implements ICard {
   }
 
   public get attack(): number {
+    if (this.isPhoenixEgg) return 0;
+    const reduction = this.activeEffects.find(effect => effect.type === EffectType.AttackReduction);
+    return reduction ? Math.max(1, this._attack - Math.floor(this._attack * (reduction.value ?? 0.5))) : this._attack;
+  }
+
+  public get unreducedAttack(): number {
     return this._attack;
   }
 
   public set attack(value: number) {
     this._attack = value;
+  }
+
+  public setDisplayedAttack(value: number): void {
+    const reduction = this.activeEffects.find(effect => effect.type === EffectType.AttackReduction);
+    this._attack = reduction ? Math.floor(value / (1 - (reduction.value ?? 0.5))) : value;
+    // A stat swap replaces the attack value, including any bonuses it contained.
+    this.attackBonus = 0;
+    this.removeEffect(EffectType.WarriorRage);
   }
 
   public get health(): number {
@@ -228,12 +351,47 @@ export class Card implements ICard {
     this._activeEffects = effects;
   }
 
-  public get maxAttack(): number | undefined {
-    return this._maxAttack;
+  public amplifyIncomingDamage(damage: number): number {
+    const mark = this.activeEffects.find(effect => effect.type === EffectType.Mark);
+    return Math.floor(damage * (mark?.value ?? 1));
   }
 
-  public set maxAttack(value: number | undefined) {
-    this._maxAttack = value;
+  public increaseAttack(amount: number): void {
+    this._attack += amount;
+    this.attackBonus += amount;
+  }
+
+  public get blocksStatRecovery(): boolean {
+    return this.hasEffect(EffectType.VoidLock);
+  }
+
+  public increaseHealth(amount: number): void {
+    this._maxHealth += amount;
+    this._health += amount;
+    this.maxHealthBonus += amount;
+  }
+
+  public removeStatBuffs(): void {
+    this._attack = Math.max(0, this._attack - this.attackBonus);
+    if (this.maxHealthBonus > 0) {
+      this._maxHealth = Math.max(1, this._maxHealth - this.maxHealthBonus);
+      this._health = Math.min(this._health, this._maxHealth);
+    }
+    this.attackBonus = 0;
+    this.maxHealthBonus = 0;
+    this.removeEffect(EffectType.WarriorRage);
+  }
+
+  public tickMark(activeTeam: Card[]): void {
+    const effect = this.activeEffects.find(effect => effect.type === EffectType.Mark);
+    if (effect?.source && activeTeam.includes(effect.source) && --effect.duration <= 0) {
+      this.removeEffect(EffectType.Mark);
+    }
+  }
+
+  public tickInvisibility(): void {
+    const effect = this.activeEffects.find(effect => effect.type === EffectType.Invisible);
+    if (effect && --effect.duration <= 0) this.removeEffect(EffectType.Invisible);
   }
 
   public get maxHealth(): number {

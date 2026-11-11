@@ -1,13 +1,13 @@
 import { Card, LeaderCard } from "../game/Card";
 import { Deck } from "../game/Deck";
 import { CharacterList } from "../shared/constants/characters";
-import { AttackType, ClassType, Rarity, UnitType } from "../shared/enums";
+import { ClassType, Rarity, UnitType } from "../shared/enums";
 import { AvailabilityType } from "../shared/interfaces";
+import { cardClasses, cardTraitNames, classNames, renderCardTraitBadges } from "./cardTraits";
 
 const deckSize = 10;
 const limits = { [Rarity.Legendary]: 2, [Rarity.Rare]: 4, [Rarity.Common]: deckSize };
 const rarityNames = { [Rarity.Legendary]: "Efsanevi", [Rarity.Rare]: "Nadir", [Rarity.Common]: "Yaygın" };
-const classNames = { [ClassType.Mage]: "Büyücü", [ClassType.Rogue]: "Haydut", [ClassType.Tank]: "Tank", [ClassType.Warrior]: "Savaşçı" };
 
 export class DeckView {
   private readonly selected = new Set<Card>();
@@ -119,7 +119,7 @@ export class DeckView {
     for (const [card, { tile }] of this.tiles) {
       const visible = card.name.toLowerCase().includes(query)
         && (!this.unit.value || card.unitType === this.unit.value)
-        && (!this.cardClass.value || card.classType === this.cardClass.value)
+        && (!this.cardClass.value || cardClasses(card).some(type => type === this.cardClass.value))
         && (!this.rarity.value || card.rarity === this.rarity.value);
       tile.hidden = !visible;
       if (visible) count++;
@@ -151,15 +151,15 @@ export class DeckView {
       </div>
       <div class="card-caption">
         <strong></strong>
-        <div class="card-meta"><span></span><span></span></div>
+        <div class="card-meta"></div>
         <div class="card-stats"><span></span><span></span></div>
       </div>`;
-    action.querySelector(".card-art")!.prepend(this.portrait(card));
+    const portrait = this.portrait(card);
+    portrait.className = "card-portrait";
+    action.prepend(portrait);
     action.querySelector(".card-badge")!.textContent = card instanceof LeaderCard ? "♜ Lider" : rarityNames[card.rarity];
     action.querySelector("strong")!.textContent = card.name;
-    const [cardClass, attackType] = action.querySelectorAll(".card-meta span");
-    cardClass.textContent = classNames[card.classType];
-    attackType.textContent = card.attackType === AttackType.Ranged ? "Menzilli" : "Yakın dövüş";
+    renderCardTraitBadges(action.querySelector(".card-meta")!, card);
     const [attack, health] = action.querySelectorAll(".card-stats span");
     attack.textContent = "⚔ " + card.attack;
     attack.setAttribute("aria-label", "Saldırı " + card.attack);
@@ -178,7 +178,7 @@ export class DeckView {
     info.textContent = "i";
     info.setAttribute("aria-label", card.name + " kart bilgisi");
     info.addEventListener("click", () => {
-      this.details.querySelector("#detail-category")!.textContent = rarityNames[card.rarity] + " · " + classNames[card.classType];
+      this.details.querySelector("#detail-category")!.textContent = [rarityNames[card.rarity], ...cardTraitNames(card)].join(" · ");
       this.details.querySelector("#detail-title")!.textContent = card.name;
       this.details.querySelector("#detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
       this.details.querySelector("#detail-health")!.textContent = `♥ Can ${card.health}`;

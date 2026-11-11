@@ -124,12 +124,12 @@
 .battle-card { grid-column: var(--card-column); }
 .battle-card .card-action { display: flex; flex-direction: column; }
 .battle-card .card-art { width: 100%; aspect-ratio: 1 / 1.02; }
-.battle-card .card-art > img { position: absolute; inset: 0; object-position: center 15%; }
+.battle-card .card-portrait { object-position: center 15%; }
 .battle-card .card-caption { width: 100%; flex: 1; }
 .battle-card .card-caption strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.battle-card .card-meta { line-height: 1.25; min-block-size: 2.5em; align-content: start; }
 .battle-card .card-action[aria-disabled="true"] img { opacity: 1; }
-.battle-card[data-state="locked"] .card-art > img, .battle-card[data-state="frozen"] .card-art > img { filter: brightness(.75); }
+.battle-card.is-invisible:not([data-state="target"]) .card-action { opacity: .45; }
+.battle-card[data-state="locked"] .card-portrait, .battle-card[data-state="frozen"] .card-portrait { filter: brightness(.75); }
 .battle-card[data-state="attacker"] .card-action { outline: 2px solid var(--gold); outline-offset: 2px; }
 .battle-card[data-state="target"] .card-action { outline: 2px solid #95c9aa; outline-offset: 2px; }
 .battle-card[data-state="target"] .card-action:hover { box-shadow: 0 0 16px #95c9aa70; }
@@ -157,15 +157,31 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.battle-card-effects .effect-badge { --effect-badge-size: 22px; }
+.battle-card-effects .effect-badge { --effect-badge-size: 33px; border-radius: 50%; }
 #battle-detail-effects .effect-badge {
+  --effect-badge-size: 45px;
   border: 0;
   background: transparent;
+}
+#battle-detail-effects .effect-clock { --effect-badge-size: 20px; }
+.battle-effect-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.battle-effect-heading span, .battle-effect-duration { color: var(--muted); font-size: .8rem; }
+.battle-effect-duration {
+  display: flex;
+  flex: 0 0 64px;
+  align-self: stretch;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-inline-start: auto;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid var(--line);
+  text-align: end;
+  white-space: nowrap;
 }
 #battle-detail-effects { list-style: none; padding: 0; margin: 0; }
 #battle-detail-effects li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
 #battle-detail-effects small { display: block; color: var(--muted); }
-.battle-health { width: 100%; height: 5px; accent-color: #c87275; }
 
 #battle-preview {
   position: fixed;
@@ -215,7 +231,6 @@
 .is-scaled .battle-row { grid-template-rows: minmax(0, 1fr); gap: 13px; }
 .is-scaled .battle-card .card-art { flex: 1 1 0; min-height: 0; aspect-ratio: auto; }
 .is-scaled .battle-card .card-caption { flex: 0 0 auto; }
-.is-scaled .battle-card .card-art > img { object-fit: contain; object-position: center; }
 .is-scaled .battle-toolbar { position: relative; }
 .is-scaled .battle-panels { position: static; }
 .is-scaled .battle-panel-content {
@@ -254,13 +269,12 @@
   .battle-card .card-art { flex: 1 1 0; min-height: 0; aspect-ratio: auto; }
   .battle-card .card-badge { left: 3px; top: 3px; padding: 2px; font-size: .53rem; }
   .battle-card .card-info { top: 3px; right: 3px; width: 20px; height: 20px; font-size: .7rem; }
-  .battle-card .card-caption { flex: 0 0 auto; padding: 3px 5px; gap: 2px; }
+  .battle-card .card-caption { --trait-badge-size: 24px; --trait-badge-padding: 1.5px; flex: 0 0 auto; padding: 3px 5px; gap: 2px; }
   .battle-card .card-caption strong { font-size: .7rem; padding-bottom: 2px; }
-  .battle-card .card-meta { display: none; }
-  .battle-card .card-stats { gap: 2px; font-size: .68rem; }
+  .battle-card .card-meta { gap: 2px; }
+  .battle-card .card-stats { font-size: 1.02rem; }
   .battle-card-effects { inset: auto 3px 3px; gap: 2px; }
-  .battle-card-effects .effect-badge { --effect-badge-size: 18px; }
-  .battle-health { height: 4px; }
+  .battle-card-effects .effect-badge { --effect-badge-size: 27px; }
   .battle-panels summary, #open-exit-match { padding-inline: 6px; font-size: .72rem; }
 }
 
@@ -296,4 +310,5 @@
 @media (orientation: landscape) and (max-height: 540px) {
   .battle-arena { --battle-side-width: min(100%, 640px); }
   .battle-row { grid-template-rows: minmax(0, 1fr); }
+  .battle-card .card-stats { margin-block-start: -2px; font-size: .85rem; }
 }
