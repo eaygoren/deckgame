@@ -1,4 +1,3 @@
-import { Application } from "pixi.js";
 import { Card, LeaderCard } from "./Card";
 import { Deck } from "./Deck";
 import { Player } from "./Player";
@@ -8,15 +7,14 @@ import { ClassType, Rarity, Turn, UnitType } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
-import gsap from "gsap";
 import { BroadcastEvents } from "../shared/constants/events";
 import { CharacterList } from "../shared/constants/characters";
-import { CARD_POSITIONS, Environment } from "../shared/constants/gameConfig";
+import { Environment } from "../shared/constants/gameConfig";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { BotAI } from "./BotAI";
+import { AvailabilityType } from "../shared/interfaces";
 
 export class Game {
-  private _app: Application;
   private _broadcast: Broadcast;
   private _battlefield: BattleField;
   private _combatManager: CombatManager;
@@ -27,57 +25,58 @@ export class Game {
   private _playerCardViews: CardView[] = [];
   private _botCardViews: CardView[] = [];
   private _attacker: CardView | null = null;
-  private _defender: CardView | null = null;
   private _turn: Turn = Turn.Player;
+  private _phase: "ready" | "attacking" | "resolving" | "finished" = "ready";
+  private stopped = false;
+  private botTimer?: ReturnType<typeof setTimeout>;
+  private readonly turnHint = document.getElementById("battle-hint")!;
+  private readonly preview = document.querySelector<HTMLElement>("#battle-preview")!;
+  private previewTarget: CardView | null = null;
 
-  constructor(app: Application, playerDeck: Deck) {
-    this._app = app;
-    this._broadcast = Broadcast.getInstance();
-    this._battlefield = BattleField.getInstance();
-    this._app.stage.addChild(this._battlefield);
-    this._combatManager = CombatManager.getInstance();
-    this._animationManager = AnimationManager.getInstance();
-    this._botAI = BotAI.getInstance();
-    // create players
+  constructor(playerDeck: Deck, private readonly onMatchEnded: (won: boolean) => void) {
+    this._broadcast = new Broadcast();
+    this._battlefield = new BattleField(this._broadcast);
+    this._combatManager = new CombatManager(this._broadcast);
+    this._animationManager = new AnimationManager(this._broadcast);
+    this._botAI = new BotAI(this._combatManager);
     this._player = this.createPlayer(playerDeck);
     this._bot = this.createBot();
-
-    this.eventListeners();
+    this._combatManager.player = this._player;
+    this._combatManager.opponent = this._bot;
   }
 
-  private eventListeners() {
-    this._broadcast.on(BroadcastEvents.TURN_COMPLETED, this.onTurnCompleted.bind(this));
-    this._broadcast.on(BroadcastEvents.CHECK_FOR_WINNER, this.checkForWinner.bind(this));
-    this._broadcast.on(BroadcastEvents.RESET_INTERACTION, this.handleInteraction.bind(this));
-    this._broadcast.on(BroadcastEvents.ADD_NEW_CARDS, this.addNewCards.bind(this));
-    this._broadcast.on(BroadcastEvents.CARDS_REMOVED, this.onCardsRemoved.bind(this));
+  public start(): void {
+    this._playerCardViews = this.mountHand(this._player, Turn.Player);
+    this._botCardViews = this.mountHand(this._bot, Turn.Bot);
+    this._battlefield.updateCardPanels(this._player, this._bot);
+    this.startTurn();
   }
 
-  public start() {
-    this.renderHands();
-    this.setupInteraction();
+  public stop(): void {
+    this.stopped = true;
+    this._phase = "finished";
+    clearTimeout(this.botTimer);
+    this.clearDamagePreview();
   }
 
   private createPlayer(deck: Deck): Player {
     const leader = deck.leader;
-    console.log("Player leader card:", leader);
 
     const nonLeaderCards = deck.cards.filter(c => c.unitType !== UnitType.Leader);
     const randomSelectedCards = this.getRandomUniqueItems(nonLeaderCards, 4);
 
-    const handCards: Card[] = [leader!, ...randomSelectedCards];
-    console.log("Player hand cards:", handCards);
+    const handCards: Card[] = [leader, ...randomSelectedCards];
 
     const remainingCards = nonLeaderCards.filter(card => !randomSelectedCards.includes(card));
-    const deckCards: Card[] = remainingCards;
-    console.log("Player deck cards after hand:", deckCards);
+    const team: Card[] = deck.cards;
 
     if (leader) {
-      deck.cards = [leader, ...deckCards];
+      deck.cards = [...remainingCards];
     }
 
     const player = new Player("Player", deck);
     player.hand = handCards;
+    player.team = team;
 
     return player;
   }
@@ -119,23 +118,26 @@ export class Game {
     );
 
     // Hand and deck separation
-    const handCards = [leader, ...otherCards.slice(0, 4)];
-    const deckCards = otherCards.slice(4);
-    deck.cards = [leader, ...deckCards];
+    const openingCards = this.getRandomUniqueItems(otherCards, 4);
+    const handCards = [leader, ...openingCards];
+    const deckCards = otherCards.filter(card => !openingCards.includes(card));
+    const team: Card[] = [...handCards, ...deckCards];
+    deck.cards = [...deckCards];
     const player = new Player("Bot", deck);
     player.hand = handCards;
+    player.team = team;
 
     return player;
   }
 
   private getFlexibleBalancedCards(maxLegendary: number, maxRare: number, maxCommon: number): Card[] {
     const keys = Object.keys(CharacterList) as Array<keyof typeof CharacterList>;
-    const nonLeaderKeys = keys.filter(key => CharacterList[key].unitType !== UnitType.Leader);
+    const playableKeys = keys.filter(key => CharacterList[key].unitType !== UnitType.Leader && CharacterList[key].availabilityType === AvailabilityType.Playable);
 
     // Separate cards by rarity
-    const legendaryKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Legendary);
-    const rareKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Rare);
-    const commonKeys = nonLeaderKeys.filter(key => CharacterList[key].rarity === Rarity.Common);
+    const legendaryKeys = playableKeys.filter(key => CharacterList[key].rarity === Rarity.Legendary);
+    const rareKeys = playableKeys.filter(key => CharacterList[key].rarity === Rarity.Rare);
+    const commonKeys = playableKeys.filter(key => CharacterList[key].rarity === Rarity.Common);
 
     const selectedKeys: (keyof typeof CharacterList)[] = [];
 
@@ -179,318 +181,174 @@ export class Game {
   }
 
   private getRandomUniqueItems<T>(array: T[], count: number): T[] {
-    const shuffled = [...array].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, Math.min(count, array.length));
-  }
-
-  private renderHands() {
-    this._battlefield.removeChildren();
-    this._playerCardViews = [];
-    this._botCardViews = [];
-    // Show deck counts through BattleField (exclude leader from count)
-    const playerDeckCount = this._player.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
-    const botDeckCount = this._bot.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
-    this._battlefield.showDeckCounts(playerDeckCount, botDeckCount);
-    // Player hand layout
-    this.renderHand(this._player, 750, this._playerCardViews);
-    // Bot hand layout
-    this.renderHand(this._bot, 200, this._botCardViews);
-  }
-
-  private renderHand(player: Player, y: number, viewArr: CardView[]) {
-    const hand = [...player.hand];
-    console.log(`Rendering hand for ${player.name}:`, hand);
-    const occupiedSlots = new Set<number>();
-
-    //console.log(`=== Rendering ${player === this._player ? 'Player' : 'Bot'} Hand ===`);
-
-    // İlk önce leader'ı slot 2'ye yerleştir
-    const leaderCard = hand.find(c => c.unitType === UnitType.Leader);
-    console.log(`Leader card for ${player.name}:`, leaderCard);
-    if (leaderCard) {
-      const cardView = new CardView(leaderCard);
-      cardView.x = CARD_POSITIONS[2].x; // Leader her zaman slot 2
-      cardView.y = y;
-      player === this._player ? this._battlefield.addChildToPlayerField(cardView) : this._battlefield.addChildToBotField(cardView);
-      viewArr.push(cardView);
-      occupiedSlots.add(2);
-      //console.log(`Leader ${leaderCard.Name} placed at slot 2, position x: ${CARD_POSITIONS[2].x}`);
+    const shuffled = [...array];
+    const sampleSize = Math.min(count, shuffled.length);
+    for (let index = 0; index < sampleSize; index++) {
+      const randomIndex = index + Math.floor(Math.random() * (shuffled.length - index));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
     }
-
-    // Sonra diğer kartları boş slot'lara yerleştir
-    const otherCards = hand.filter(c => c.unitType !== UnitType.Leader);
-    otherCards.forEach(card => {
-      let targetSlot = -1;
-
-      // Boş slot bul
-      for (let i = 0; i < CARD_POSITIONS.length; i++) {
-        if (!occupiedSlots.has(i)) {
-          targetSlot = i;
-          occupiedSlots.add(i);
-          break;
-        }
-      }
-
-      if (targetSlot !== -1) {
-        const cardView = new CardView(card);
-        cardView.x = CARD_POSITIONS[targetSlot].x;
-        cardView.y = y;
-        player === this._player ? this._battlefield.addChildToPlayerField(cardView) : this._battlefield.addChildToBotField(cardView);
-        viewArr.push(cardView);
-        //console.log(`Card ${card.Name} placed at slot ${targetSlot}, position x: ${CARD_POSITIONS[targetSlot].x}`);
-      }
-    });
+    return shuffled.slice(0, sampleSize);
   }
 
-  private setupInteraction() {
-    this._playerCardViews.forEach(view => {
-      view.removeAllListeners(); // Clear any existing listeners first
-      view.on("pointertap", () => this.handlePlayerCardClick(view));
-    });
-    this._botCardViews.forEach(view => {
-      view.removeAllListeners(); // Clear any existing listeners first
-      view.on("pointertap", () => this.handleBotCardClick(view));
-    });
+  private mountHand(player: Player, side: Turn): CardView[] {
+    const unitSlots = [0, 1, 3, 4];
+    return player.hand.map(card => this.mountCard(card, side, card.unitType === UnitType.Leader ? 2 : unitSlots.shift()!));
   }
 
-  private resetInteraction() {
-    this._playerCardViews.forEach(view => {
-      view.removeAllListeners(); // Remove all listeners
-    });
-    this._botCardViews.forEach(view => {
-      view.removeAllListeners(); // Remove all listeners
-    });
+  private mountCard(card: Card, side: Turn, slot: number): CardView {
+    const view = new CardView(card, slot);
+    this._battlefield.addCard(view, side);
+    if (side === Turn.Player) {
+      view.action.addEventListener("click", () => this.handlePlayerCardClick(view));
+    } else {
+      let touch = false;
+      view.action.addEventListener("pointerdown", event => { touch = event.pointerType === "touch"; });
+      view.action.addEventListener("click", event => {
+        this.handleBotCardClick(view, touch && event.detail > 0);
+        touch = false;
+      });
+      view.action.addEventListener("pointerenter", event => {
+        if (event.pointerType !== "touch") {
+          this.showDamagePreview(view, false, event);
+        }
+      });
+      view.action.addEventListener("pointermove", event => {
+        if (event.pointerType !== "touch" && this.previewTarget === view) {
+          this.positionDamagePreview(event.clientX, event.clientY);
+        }
+      });
+      view.action.addEventListener("pointerleave", event => {
+        if (event.pointerType !== "touch") this.clearDamagePreview();
+      });
+      view.action.addEventListener("focus", () => {
+        if (!touch && this.previewTarget !== view) this.showDamagePreview(view);
+      });
+      view.action.addEventListener("blur", () => this.clearDamagePreview());
+    }
+    return view;
   }
 
-  private handlePlayerCardClick(view: CardView) {
-    if (this._defender || this._attacker) {
-      this._defender = null;
+  private canTarget(card: Card, opponent: Player): boolean {
+    return card.health > 0 && (card.unitType !== UnitType.Leader
+      || !opponent.hand.some(ally => ally.health > 0 && ally.unitType !== UnitType.Leader));
+  }
 
-      if (this._attacker === view) {
-        // Cancel selection
-        gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+  private clearDamagePreview(): void {
+    this.previewTarget?.action.removeAttribute("aria-describedby");
+    this.previewTarget = null;
+    this.preview.hidden = true;
+  }
 
-        gsap.to(view.descriptionContainer, {
-          alpha: 0, duration: 0.2, onComplete: () => {
-            view.descriptionContainer.visible = false;
-          }
-        });
+  private positionDamagePreview(x: number, y: number): void {
+    const gap = 28;
+    const edge = 12;
+    let width = document.documentElement.clientWidth;
+    let height = window.innerHeight;
+    const arena = this.preview.offsetParent;
+    if (arena instanceof HTMLElement && arena.classList.contains("is-scaled")) {
+      const bounds = arena.getBoundingClientRect();
+      const scale = bounds.width / arena.offsetWidth;
+      x = (x - bounds.left) / scale;
+      y = (y - bounds.top) / scale;
+      width = arena.clientWidth;
+      height = arena.clientHeight;
+    }
+    const { offsetWidth, offsetHeight } = this.preview;
+    const left = Math.min(x - offsetWidth / 2, width - offsetWidth - edge);
+    const top = y + gap + offsetHeight <= height - edge ? y + gap : y - offsetHeight - gap;
+    this.preview.style.left = Math.max(edge, left) + "px";
+    this.preview.style.top = Math.max(edge, top) + "px";
+  }
 
-        this._attacker = null;
-        return;
-      }
+  private showDamagePreview(target: CardView, confirmWithTap = false, pointer?: PointerEvent): void {
+    if (this._turn !== Turn.Player || this._phase !== "ready" || !this._attacker) return;
+    if (!this.canTarget(target.card, this._bot)) return;
 
-      this._playerCardViews.forEach(v => {
-        if (v !== view) {
-          gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
-          gsap.to(v.descriptionContainer, {
-            alpha: 0, duration: 0.2, onComplete: () => {
-              v.descriptionContainer.visible = false;
-            }
-          });
-        }
-      });
+    const attacker = this._attacker.card;
+    const { normal, critical, counter } = this._combatManager.previewCombat(attacker, target.card);
+    const parts = [target.card.name + " · Hasar " + normal];
+    if (critical !== null) parts.push("Kritik " + critical);
+    parts.push("Karşı hasar " + counter);
+    if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("Yetenek değerleri değiştirebilir");
+    if (confirmWithTap) parts.push("Saldırmak için tekrar dokun");
+    this.clearDamagePreview();
+    this.preview.textContent = parts.join(" · ");
+    this.preview.hidden = false;
+    this.previewTarget = target;
+    target.action.setAttribute("aria-describedby", this.preview.id);
+    const bounds = target.action.getBoundingClientRect();
+    this.positionDamagePreview(pointer?.clientX ?? bounds.left + bounds.width / 2, pointer?.clientY ?? bounds.bottom);
+  }
 
-      this._botCardViews.forEach(v => {
-        gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
-        gsap.to(v.descriptionContainer, {
-          alpha: 0, duration: 0.2, onComplete: () => {
-            v.descriptionContainer.visible = false;
-          }
-        });
-      });
+  private updateBattleHud(): void {
+    this.clearDamagePreview();
+    const playerTurn = this._turn === Turn.Player;
+    const choosingTarget = playerTurn && this._phase === "ready" && this._attacker !== null;
+    this.turnHint.textContent = this._phase === "finished" ? "Maç bitti"
+      : this._phase !== "ready" ? "Hamle sonuçlanıyor…"
+      : !playerTurn ? "Rakip düşünüyor…"
+      : choosingTarget ? "Bir hedef seç" : "Saldıracak kartı seç";
 
-      gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
+    const ready = playerTurn && this._phase === "ready";
+    this._battlefield.setActiveSide(this._phase === "finished" ? null : this._turn);
+    for (const view of this._playerCardViews) {
+      const frozen = view.card.hasEffect(EffectType.Freeze);
+      const state = view === this._attacker && choosingTarget ? "attacker" : frozen ? "frozen" : "idle";
+      view.setState(state, ready && !frozen);
+    }
+    for (const view of this._botCardViews) {
+      const targetable = this.canTarget(view.card, this._bot);
+      view.setState(choosingTarget && targetable ? "target" : targetable ? "idle" : "locked", choosingTarget && targetable);
+    }
+  }
 
-      gsap.to(view.descriptionContainer, {
-        alpha: 1, duration: 0.2, onStart: () => {
-          view.descriptionContainer.visible = true;
-        }
-      });
+  private handlePlayerCardClick(view: CardView): void {
+    if (this._turn !== Turn.Player || this._phase !== "ready" || view.card.hasEffect(EffectType.Freeze)) return;
+    this._attacker = this._attacker === view ? null : view;
+    this.updateBattleHud();
+  }
 
-      this._attacker = view;
-
+  private handleBotCardClick(view: CardView, touch: boolean): void {
+    if (this._turn !== Turn.Player || this._phase !== "ready" || !this._attacker) return;
+    if (!this.canTarget(view.card, this._bot)) return;
+    if (touch && this.previewTarget !== view) {
+      this.showDamagePreview(view, true);
       return;
     }
-
-    if (this._turn !== Turn.Player) return;
-    if (this._attacker && this._attacker === view) {
-      // Cancel selection
-      gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
-
-      gsap.to(view.descriptionContainer, {
-        alpha: 0, duration: 0.2, onComplete: () => {
-          view.descriptionContainer.visible = false;
-        }
-      });
-
-      this._attacker = null;
-      return;
-    }
-    if (!this._attacker) {
-      this._attacker = view;
-      gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
-
-      gsap.to(view.descriptionContainer, {
-        alpha: 1, duration: 0.2, onStart: () => {
-          view.descriptionContainer.visible = true;
-        }
-      });
-    }
+    void this.attack(this._attacker, view, this._botCardViews);
   }
 
-  private handleBotCardClick(view: CardView) {
-    if (!this._attacker) {
-      if (this._defender === view) {
-        // Cancel selection
-        gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+  private botTurn(): void {
+    if (this._turn !== Turn.Bot || this._phase !== "ready") return;
+    const attackers = this._botCardViews.filter(view => !view.card.hasEffect(EffectType.Freeze));
+    const targets = this._playerCardViews.filter(view => this.canTarget(view.card, this._player));
+    const move = this._botAI.findBestMove(attackers, targets);
+    const attacker = attackers.find(view => view.card === move?.attacker);
+    const defender = targets.find(view => view.card === move?.defender);
+    if (attacker && defender) void this.attack(attacker, defender, this._playerCardViews);
+  }
 
-        gsap.to(view.descriptionContainer, {
-          alpha: 0, duration: 0.2, onComplete: () => {
-            view.descriptionContainer.visible = false;
-          }
-        });
-
-        this._defender = null;
-
-        return;
+  private async attack(attacker: CardView, defender: CardView, opponents: CardView[]): Promise<void> {
+    this._phase = "attacking";
+    this.updateBattleHud();
+    const result = await this._combatManager.resolveCombat(attacker, defender);
+    if (this.stopped) return;
+    if (result) {
+      const animation = this._animationManager.playAttack(result);
+      if (attacker.card.classType === ClassType.Mage) {
+        this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker, opponentCardViews: opponents });
       }
-
-      this._defender = view;
-
-      this._botCardViews.forEach(v => {
-        if (v !== view) {
-          gsap.to(v.scale, { x: 1, y: 1, duration: 0.2 });
-          gsap.to(v.descriptionContainer, {
-            alpha: 0, duration: 0.2, onComplete: () => {
-              v.descriptionContainer.visible = false;
-            }
-          });
-        }
-      });
-
-      gsap.to(view.scale, { x: 1.2, y: 1.2, duration: 0.2 });
-
-      gsap.to(view.descriptionContainer, {
-        alpha: 1, duration: 0.2, onStart: () => {
-          view.descriptionContainer.visible = true;
-        }
-      });
-
-      return;
+      await animation;
     }
-
-    if (this._turn !== Turn.Player) return;
-    if (this._defender && this._defender === view) return;
-
-    // TURN BAŞINDA SKILL KONTROLÜ - Player turn'ünün ilk saldırısında
-    if (!this._defender) {
-      this.triggerStartOfTurnSkills();
-    }
-
-    // Lider kartına sadece karşı tarafın sadece lideri kaldığında saldırılabilir
-    if (view.card.unitType === UnitType.Leader) {
-      const nonLeaderCards = this._bot.hand.filter(c => c.unitType !== UnitType.Leader);
-      if (nonLeaderCards.length > 0) {
-        // Henüz lider olmayan kartlar var, lidere saldıramazsın
-        return;
-      }
-    }
-
-    this._defender = view;
-
-    gsap.to(this._defender.scale, {
-      x: 1.2, y: 1.2, duration: 0.2, onStart: () => {
-        gsap.to([this._attacker!.descriptionContainer, this._defender?.descriptionContainer], {
-          alpha: 0, duration: 0.2, onComplete: () => {
-            this._attacker!.descriptionContainer.visible = false;
-            this._defender!.descriptionContainer.visible = false;
-          }
-        });
-      }
-    });
-
-    this.resolveZIndex(this._player);
-
-    this.resolvePlayerAttack(this._attacker, this._defender);
+    await this.onTurnCompleted();
   }
 
-  private async resolvePlayerAttack(attacker: CardView, defender: CardView) {
-    if (!attacker || !defender) return;
-
-    const combatResult = await this._combatManager.resolveCombat(attacker, defender);
-
-    setTimeout(() => {
-      if (combatResult) {
-        this._animationManager.resolvePlayerAttackWithAnimation(combatResult);
-
-        if (combatResult.attacker.card.classType === ClassType.Mage) {
-          this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: combatResult.attacker, opponentCardViews: this._botCardViews });
-        }
-      }
-    }, 500);
-  }
-
-  private botTurn() {
-    // BOT TURN BAŞLANGICI - Effect'leri güncelle ve start of turn skill'leri tetikle
-    this.triggerStartOfTurnSkills();
-
-    // Bot için hedef seçimi: Lider kartına sadece oyuncunun sadece lideri kaldığında saldırabilir
-    const playerNonLeaderCards = this._player.hand.filter(c => c.unitType !== UnitType.Leader);
-    let availableTargetViews = this._playerCardViews;
-
-    if (playerNonLeaderCards.length > 0) {
-      // Oyuncuda lider olmayan kartlar varsa, sadece onlara saldırabilir
-      availableTargetViews = this._playerCardViews.filter(view => view.card.unitType !== UnitType.Leader);
-    }
-
-    // Eğer hedef yoksa çık (bu durumda zaten oyun biter)
-    if (availableTargetViews.length === 0) return;
-
-    // Bot her zaman bir hamle yapar - en iyi hamleyi bul
-    const bestMove = this._botAI.findBestMove(this._botCardViews, availableTargetViews);
-
-    if (!bestMove) {
-      //console.error("Bot could not find any move! This should not happen.");
-      return;
-    }
-
-    //console.log(`Bot selected move: ${bestMove.attacker.Name}(${bestMove.attacker.Attack}/${bestMove.attacker.Health}) -> ${bestMove.defender.Name}(${bestMove.defender.Attack}/${bestMove.defender.Health})`);
-
-    const attacker = this._botCardViews.find(v => v.card === bestMove.attacker);
-    const defender = this._playerCardViews.find(v => v.card === bestMove.defender);
-
-    if (!attacker || !defender) return;
-
-    gsap.to(attacker.scale, { x: 1.2, y: 1.2, duration: 0.2 });
-    gsap.to(defender.scale, { x: 1.2, y: 1.2, duration: 0.2 });
-
-    this.resolveZIndex(this._bot);
-
-    this.resolveBotAttack(attacker, defender);
-  }
-
-  private async resolveBotAttack(attacker: CardView, defender: CardView) {
-    if (!attacker || !defender) return;
-
-    const combatResult = await this._combatManager.resolveCombat(attacker, defender);
-
-    if (combatResult) {
-      setTimeout(() => {
-        this._animationManager.resolvePlayerAttackWithAnimation(combatResult);
-
-        if (combatResult.attacker.card.classType === ClassType.Mage) {
-          this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker: combatResult.attacker, opponentCardViews: this._playerCardViews });
-        }
-      }, 500);
-    }
-  }
-
-  // Effect damage - sadece belirli owner'ın effect'leri çalışır
-  private async applyEffectDamageIfOwner(card: Card): Promise<void> {
+  // Effect damage
+  private async applyEffectDamage(card: Card): Promise<void> {
     if (!card.activeEffects) return;
 
     for (const effect of card.activeEffects) {
+      const previousHealth = card.health;
       switch (effect.type) {
         case EffectType.Bleed:
           const bleedDamage = effect.value || 1;
@@ -502,9 +360,8 @@ export class Game {
           }
 
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-            x: cardView?.x,
-            y: cardView?.y,
-            message: `${card.name} loses ${bleedDamage} health due to bleed!`,
+            targetView: cardView,
+            message: `Kanama · ${previousHealth - card.health} hasar`,
             color: "#ff0000"
           });
           break;
@@ -523,10 +380,24 @@ export class Game {
           }
 
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-            x: burnCardView?.x,
-            y: burnCardView?.y,
-            message: `${card.name} loses ${burnDamage} health due to burn!`,
+            targetView: burnCardView,
+            message: `Yanma · ${previousHealth - card.health} hasar`,
             color: "#ff4500"
+          });
+          break;
+        case EffectType.Poison:
+          const poisonDamage = effect.value || 1;
+          card.health = Math.max(0, card.health - poisonDamage);
+
+          const poisonCardView = this.findCardView(card);
+          if (poisonCardView) {
+            poisonCardView.updateStats();
+          }
+
+          this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            targetView: poisonCardView,
+            message: `Zehir · ${previousHealth - card.health} hasar`,
+            color: "#008000"
           });
           break;
       }
@@ -545,26 +416,54 @@ export class Game {
     return null;
   }
 
+  private startTurn(): void {
+    const activeViews = this._turn === Turn.Player ? this._playerCardViews : this._botCardViews;
+    for (const view of activeViews) {
+      view.card.removeEffect(EffectType.Protection);
+    }
+
+    this.triggerStartOfTurnSkills();
+    for (const view of activeViews) {
+      void view.updateCover();
+    }
+
+    if (activeViews.every(view => view.card.hasEffect(EffectType.Freeze))) {
+      this._phase = "attacking";
+      this.updateBattleHud();
+      void this.onTurnCompleted();
+      return;
+    }
+
+    this._phase = "ready";
+    this.updateBattleHud();
+    if (this._turn === Turn.Bot) this.botTimer = setTimeout(() => this.botTurn(), 2000);
+  }
+
   // Start of turn skill'leri
   private triggerStartOfTurnSkills(): void {
-    const allCards = [...this._playerCardViews, ...this._botCardViews];
+    const isPlayerTurn = this._turn === Turn.Player;
+    const activeCardViews = isPlayerTurn ? this._playerCardViews : this._botCardViews;
+    const player = isPlayerTurn ? this._player : this._bot;
+    const opponent = isPlayerTurn ? this._bot : this._player;
 
-    allCards.forEach(view => {
-      if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn) {
+    activeCardViews.forEach(view => {
+      if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn && view.card.health > 0) {
         const context: CombatContext = {
           attacker: view.card,
           defender: null,
           damage: 0,
           isCounterAttack: false,
-          allPlayerCards: this._player.hand,
-          allBotCards: this._bot.hand
+          allPlayerCards: player.hand,
+          allOpponentCards: opponent.hand,
+          player,
+          opponent,
         };
 
         const result = view.card.useSkill(undefined, context);
         if (result?.success && result.message) {
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-            x: view.x,
-            y: view.y,
+            targetView: view,
+            abilityName: view.card.skill.name,
             message: result.message,
             color: "#9932cc"
           });
@@ -573,215 +472,115 @@ export class Game {
     });
   }
 
+  private triggerDeathSkills(): void {
+    const allDeadCards = [...this._playerCardViews, ...this._botCardViews].filter(view => view.card.health <= 0);
+
+    allDeadCards.forEach(deadCardView => {
+      if (deadCardView.card.skill?.triggerTiming === SkillTiming.OnDeath) {
+        const result = deadCardView.card.useSkill(deadCardView.card.skill.target, {
+          player: this._player.team.includes(deadCardView.card) ? this._player : this._bot
+        });
+
+        if (result?.success && result.message) {
+          this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            targetView: deadCardView,
+            abilityName: deadCardView.card.skill.name,
+            message: result.message,
+            color: "#a7d5b6"
+          });
+        }
+      }
+    });
+
+    const allCardViews = [...this._playerCardViews, ...this._botCardViews];
+
+    for (const cardView of allCardViews) {
+      cardView.updateStats();
+    }
+  }
+
+  private async checkActiveEffects(): Promise<void> {
+    let cardViews: CardView[] = [];
+
+    switch (this._turn) {
+      case Turn.Player:
+        cardViews = this._playerCardViews;
+        break;
+      case Turn.Bot:
+        cardViews = this._botCardViews;
+        break;
+    }
+
+    for (const cardView of cardViews) {
+      if (cardView.card.activeEffects) {
+        await this.applyEffectDamage(cardView.card);
+        await cardView.card.updateEffects();
+        await cardView.updateCover();
+        cardView.updateStats();
+      }
+    }
+
+  }
+
   private async onTurnCompleted(): Promise<void> {
+    if (this._phase !== "attacking") return;
+    this._phase = "resolving";
+
+    await this.checkActiveEffects();
+    if (this.stopped) return;
+    this.triggerDeathSkills();
+
     this._attacker = null;
-    this._defender = null;
 
-    this._playerCardViews.forEach(async view => {
-      view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
+    this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
+    const playerDead = this._playerCardViews.filter(view => view.card.health <= 0);
+    const botDead = this._botCardViews.filter(view => view.card.health <= 0);
+    const fallen = [...playerDead, ...botDead];
+    for (const view of fallen) {
+      view.card.clearEffects();
+      view.updateStats();
+    }
+    await this._animationManager.removeCards(fallen);
+    if (this.stopped) return;
+    this._playerCardViews = this.replaceDeadCards(this._player, Turn.Player, this._playerCardViews, playerDead);
+    this._botCardViews = this.replaceDeadCards(this._bot, Turn.Bot, this._botCardViews, botDead);
+    this._battlefield.updateCardPanels(this._player, this._bot);
 
-      if (this._turn === Turn.Player && view.card.activeEffects) {
-        await this.applyEffectDamageIfOwner(view.card).then(() => {
-          view.card.updateEffects().then(() => {
-            view.updateStats();
-          });
-        });
-      }
+    if (this.checkForWinner()) return;
 
-      await view.updateCover();
-      await view.updateStats();
-    });
-
-    this._botCardViews.forEach(async view => {
-      view.scale.x > 1 && gsap.to(view.scale, { x: 1, y: 1, duration: 0.2 });
-
-      if (this._turn === Turn.Bot && view.card.activeEffects) {
-        await this.applyEffectDamageIfOwner(view.card).then(() => {
-          view.card.updateEffects().then(() => {
-            view.updateStats();
-          });
-        });
-      }
-
-      await view.updateCover();
-      await view.updateStats();
-    });
-
-    await this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
-
-    // Ölü kartları kaldır
-    this._animationManager.removeDeadCardsWithAnimation(this._playerCardViews, this._botCardViews);
-
-    // Turn değiştir
     this._turn = this._turn === Turn.Player ? Turn.Bot : Turn.Player;
-
-    this._turn === Turn.Bot && setTimeout(() => this.botTurn(), 2000);
+    const player = this._turn === Turn.Player ? this._player : this._bot;
+    const opponent = this._turn === Turn.Player ? this._bot : this._player;
+    this._combatManager.player = player;
+    this._combatManager.opponent = opponent;
+    this.startTurn();
   }
 
-  private resolveZIndex(attacker: Player) {
-    // Z-index'i belirle
-    if (attacker === this._player) {
-      this._battlefield.playerField.zIndex = 1;
-      this._battlefield.botField.zIndex = 0;
-    } else {
-      this._battlefield.playerField.zIndex = 0;
-      this._battlefield.botField.zIndex = 1;
-    }
+  private checkForWinner(): boolean {
+    if (this._phase === "finished") return true;
 
-    this._battlefield.battleLog.zIndex = 2; // Battle log'u en üste getir
+    const playerAlive = this._player.hand.some(card => card.unitType === UnitType.Leader);
+    const botAlive = this._bot.hand.some(card => card.unitType === UnitType.Leader);
+    if (playerAlive && botAlive) return false;
+
+    this._phase = "finished";
+    this.updateBattleHud();
+    this.onMatchEnded(playerAlive);
+    return true;
   }
 
-  private addNewCards(data: { newPlayerCardViews: CardView[], newBotCardViews: CardView[], playerDeadIndexes: number[], botDeadIndexes: number[] }) {
-    // Store new cards separately to animate only them
-    const newPlayerCards: Card[] = [];
-    const newBotCards: Card[] = [];
-
-    // Yeni kart çek ve ekle
-    data.playerDeadIndexes.forEach(idx => {
-      if (data.newPlayerCardViews.map(view => view.card).length < 5) {
-        const newCard = this._player.deck.drawRandomCard();
-        if (newCard) {
-          data.newPlayerCardViews.map(view => view.card).splice(idx, 0, newCard);
-          newPlayerCards.push(newCard);
-        }
-      }
-    });
-
-    data.botDeadIndexes.forEach(idx => {
-      if (data.newBotCardViews.map(view => view.card).length < 5) {
-        const newCard = this._bot.deck.drawRandomCard();
-        if (newCard) {
-          data.newBotCardViews.map(view => view.card).splice(idx, 0, newCard);
-          newBotCards.push(newCard);
-        }
-      }
-    });
-
-    // Optimize the rendering - only animate new cards, keep existing ones in place
-    this._animationManager.renderHandsWithOptimizedAnimation(data.newPlayerCardViews, data.newBotCardViews);
+  private replaceDeadCards(player: Player, side: Turn, views: CardView[], dead: CardView[]): CardView[] {
+    const survivors = views.filter(view => !dead.includes(view));
+    player.hand = survivors.map(view => view.card);
+    for (const view of dead) {
+      const card = player.deck.drawRandomCard();
+      if (!card) break;
+      player.hand.push(card);
+      const replacement = this.mountCard(card, side, view.slot);
+      survivors.push(replacement);
+      this._animationManager.showNewCard(replacement);
+    }
+    return survivors;
   }
 
-  private checkForWinner() {
-    // Kazananı kontrol et
-    if (!this._player.hand.some(c => c.unitType === UnitType.Leader)) {
-      this._turn = Turn.Player;
-      // Oyun bittiğinde tüm animasyonları durdur
-      this._animationManager.stopAllAnimations();
-      const restart = confirm("Bot Kazandı! Yeni oyun başlatmak ister misiniz?");
-      if (restart) {
-        window.location.reload(); // Sayfayı yeniden yükle
-      }
-      return;
-    }
-    if (!this._bot.hand.some(c => c.unitType === UnitType.Leader)) {
-      this._turn = Turn.Player;
-      // Oyun bittiğinde tüm animasyonları durdur
-      this._animationManager.stopAllAnimations();
-      const restart = confirm("Oyuncu Kazandı! Yeni oyun başlatmak ister misiniz?");
-      if (restart) {
-        window.location.reload(); // Sayfayı yeniden yükle
-      }
-      return;
-    }
-  }
-
-  private handleInteraction() {
-    // Interaction'ı yeniden kur
-    this.resetInteraction();
-    this.setupInteraction();
-  }
-
-  private onCardsRemoved(data: any) {
-    if (!data) {
-      //console.warn("onCardsRemoved: No data received");
-      return;
-    }
-
-    const { playerAliveViews, botAliveViews, playerDeadViews, botDeadViews } = data;
-
-    if (playerAliveViews) {
-      //console.log(`Updating player cards from ${this._playerCardViews.length} to ${playerAliveViews.length}`);
-      this._playerCardViews = playerAliveViews;
-
-      // Player hand'den de ölü kartları kaldır
-      if (playerDeadViews && playerDeadViews.length > 0) {
-        playerDeadViews.forEach((deadView: any) => {
-          const cardIndex = this._player.hand.findIndex(card => card.id === deadView.card.id);
-          if (cardIndex !== -1) {
-            //console.log(`Removing dead card ${deadView.card.Name} from player hand`);
-            this._player.hand.splice(cardIndex, 1);
-          }
-        });
-      }
-    }
-
-    if (botAliveViews) {
-      //console.log(`Updating bot cards from ${this._botCardViews.length} to ${botAliveViews.length}`);
-      this._botCardViews = botAliveViews;
-
-      // Bot hand'den de ölü kartları kaldır
-      if (botDeadViews && botDeadViews.length > 0) {
-        botDeadViews.forEach((deadView: any) => {
-          const cardIndex = this._bot.hand.findIndex(card => card.id === deadView.card.id);
-          if (cardIndex !== -1) {
-            //console.log(`Removing dead card ${deadView.card.Name} from bot hand`);
-            this._bot.hand.splice(cardIndex, 1);
-          }
-        });
-      }
-    }
-
-    // Yeni kartlar çek
-    this.drawNewCardsToReplaceDeadOnes(playerDeadViews?.length || 0, botDeadViews?.length || 0);
-
-    // Kazanan kontrolü yap
-    this.checkForWinner();
-  }
-
-  private drawNewCardsToReplaceDeadOnes(playerDeadCount: number, botDeadCount: number) {
-    //console.log(`Drawing new cards: ${playerDeadCount} for player, ${botDeadCount} for bot`);
-
-    const newPlayerCardViews: CardView[] = [];
-    const newBotCardViews: CardView[] = [];
-
-    // Player için yeni kartlar çek
-    for (let i = 0; i < playerDeadCount; i++) {
-      if (this._player.hand.length < 5 && this._player.deck.cards.length > 0) {
-        const newCard = this._player.deck.drawRandomCard();
-        if (newCard) {
-          this._player.hand.push(newCard);
-          const newCardView = new CardView(newCard);
-          this._playerCardViews.push(newCardView);
-          newPlayerCardViews.push(newCardView);
-          //console.log(`Drew new card for player: ${newCard.Name}`);
-        }
-      }
-    }
-
-    // Bot için yeni kartlar çek
-    for (let i = 0; i < botDeadCount; i++) {
-      if (this._bot.hand.length < 5 && this._bot.deck.cards.length > 0) {
-        const newCard = this._bot.deck.drawRandomCard();
-        if (newCard) {
-          this._bot.hand.push(newCard);
-          const newCardView = new CardView(newCard);
-          this._botCardViews.push(newCardView);
-          newBotCardViews.push(newCardView);
-          //console.log(`Drew new card for bot: ${newCard.Name}`);
-        }
-      }
-    }    // Sadece yeni kartları render et
-    if (newPlayerCardViews.length > 0 || newBotCardViews.length > 0) {
-      this._animationManager.addNewCardsWithSmartPositioning(
-        newPlayerCardViews,
-        newBotCardViews,
-        this._playerCardViews,
-        this._botCardViews
-      );
-      // Deck sayılarını güncelle
-      const playerDeckCount = this._player.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
-      const botDeckCount = this._bot.deck.cards.filter(c => c.unitType !== UnitType.Leader).length;
-      this._battlefield.updateDeckCounts(playerDeckCount, botDeckCount);
-    }
-  }
 }

@@ -1,9 +1,12 @@
-import { Card } from "../../game/Card";
+import { Card } from "@/game/Card";
+import { Player } from "@/game/Player";
+import { ICard } from "../interfaces";
 
 export interface ISkill {
     name: string;
     description: string;
     triggerTiming: SkillTiming;
+    target?: Card;
     canUse(caster: Card, target?: Card, context?: CombatContext): boolean;
     execute(caster: Card, target?: Card, context?: CombatContext): SkillResult;
 }
@@ -20,12 +23,14 @@ export enum SkillTiming {
 }
 
 export interface CombatContext {
-    attacker: Card;
-    defender: Card | null; // Eğer defender null ise, bu skill sadece attacker üzerinde çalışır
-    damage: number;
-    isCounterAttack: boolean;
-    allPlayerCards: Card[];
-    allBotCards: Card[];
+    attacker?: Card;
+    defender?: Card | null; // Eğer defender null ise, bu skill sadece attacker üzerinde çalışır
+    damage?: number;
+    isCounterAttack?: boolean;
+    allPlayerCards?: Card[];
+    allOpponentCards?: Card[];
+    player?: Player;
+    opponent?: Player;
 }
 
 export interface SkillResult {
@@ -39,6 +44,7 @@ export interface SkillResult {
 export interface SkillEffect {
     type: EffectType;
     target: any;
+    protector?: Card;
     duration: number;
     value?: number;
     owner?: "player" | "bot";
@@ -52,9 +58,11 @@ export enum EffectType {
     Burn = "burn",
     Freeze = "freeze",
     Bleed = "bleed",
+    Poison = "poison",
     Mark = "mark",
     Dodge = "dodge",
     Heal = "heal",
+    Buff = "buff",
     LifeSteal = "life_steal",
     CritBoost = "crit_boost",
     AttackReduction = "attack_reduction",
@@ -63,17 +71,21 @@ export enum EffectType {
     StatSwap = "stat_swap",
     AttackCopy = "attack_copy",
     Protection = "protection",
-    WarriorRage = "warrior_rage"
+    WarriorRage = "warrior_rage",
+    SummonAlly = "summon_ally",
+    SummonDeadAlly = "summon_dead_ally"
 }
 
-export enum Target {
+export enum TargetType {
     Self = "self",
     Enemy = "enemy",
     AllEnemies = "all_enemies",
     AllAllies = "all_allies",
     LowestHpAlly = "lowest_hp_ally",
     RandomAlly = "random_ally",
-    RandomEnemy = "random_enemy"
+    RandomEnemy = "random_enemy",
+    RandomDeadAlly = "random_dead_ally",
+    None = "none"
 }
 
 export interface SkillConfig {
@@ -87,8 +99,9 @@ export interface SkillConfig {
 
 export interface EffectConfig {
     type: EffectType;
-    target: Target;
+    target?: TargetType | ICard;
     duration?: number;
     value?: number;
     chance?: number;
+    summon?: ICard;
 }

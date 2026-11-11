@@ -1,4 +1,4 @@
-import { IAbility } from "../../shared/interfaces";
+import { IAbility } from "@/shared/interfaces";
 
 export class BerserkerRageAbility implements IAbility {
     public name = "Berserker Rage";

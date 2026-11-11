@@ -2,20 +2,16 @@ import { Card, LeaderCard } from "./Card";
 
 export class Deck {
   private _cards: Card[] = [];
-  private _leader: LeaderCard | null = null;
+  private _leader!: LeaderCard;
   private _maxCards: number = 10;
 
   public addCard(card: Card) {
-    if (this._cards.length < this._maxCards) {
-      this._cards.push(card);
-    } else {
-      throw new Error("Deck is full");
-    }
+    this._cards.push(card);
   }
 
   public setLeader(leader: LeaderCard) {
     this._leader = leader;
-    
+
     if (!this._cards.includes(leader)) {
       this.addCard(leader);
     }
@@ -60,7 +56,7 @@ export class Deck {
     this._cards = value;
   }
 
-  public get leader(): LeaderCard | null {
+  public get leader(): LeaderCard {
     return this._leader;
   }
 }

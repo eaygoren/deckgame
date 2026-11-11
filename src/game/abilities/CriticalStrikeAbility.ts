@@ -1,4 +1,4 @@
-import { IAbility } from "../../shared/interfaces";
+import { IAbility } from "@/shared/interfaces";
 
 export class CriticalStrikeAbility implements IAbility {
     public name = "Critical Strike";

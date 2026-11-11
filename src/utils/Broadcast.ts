@@ -1,15 +1,5 @@
 export class Broadcast {
-    private static _instance: Broadcast;
     private _listeners: { [key: string]: Function[] } = {};
-
-    private constructor() { }
-
-    public static getInstance(): Broadcast {
-        if (!this._instance) {
-            this._instance = new Broadcast();
-        }
-        return this._instance;
-    }
 
     public on(event: string, listener: Function) {
         if (!this._listeners[event]) {

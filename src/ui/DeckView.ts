@@ -1,237 +1,255 @@
-import { Application, Container } from "pixi.js";
-import { CardView } from "./CardView";
-import { ScrollBox } from "@pixi/ui";
-import { CharacterList } from "../shared/constants";
 import { Card, LeaderCard } from "../game/Card";
-import { Rarity, UnitType } from "../shared/enums";
-import gsap from "gsap";
 import { Deck } from "../game/Deck";
+import { CharacterList } from "../shared/constants/characters";
+import { AttackType, ClassType, Rarity, UnitType } from "../shared/enums";
+import { AvailabilityType } from "../shared/interfaces";
 
-const ALLOWED_LEADER: number = 1; // Maximum number of leader cards allowed in the deck
-const ALLOWED_LEGENDARY: number = 2; // Maximum number of legendary cards allowed in the deck
-const ALLOWED_RARE: number = 4; // Maximum number of rare cards allowed in the deck
-const ALLOWED_COMMON: number = 10; // Maximum number of common cards allowed in the deck
+const deckSize = 10;
+const limits = { [Rarity.Legendary]: 2, [Rarity.Rare]: 4, [Rarity.Common]: deckSize };
+const rarityNames = { [Rarity.Legendary]: "Efsanevi", [Rarity.Rare]: "Nadir", [Rarity.Common]: "Yaygın" };
+const classNames = { [ClassType.Mage]: "Büyücü", [ClassType.Rogue]: "Haydut", [ClassType.Tank]: "Tank", [ClassType.Warrior]: "Savaşçı" };
 
-export class DeckView extends Container {
-    private _poolContainer: Container; // Container for the pool cards
-    private _deckContainer: Container; // Container for the deck cards
-    private _poolCards: CardView[] = []; // Array to hold pool cardviews
-    private _deckCards: CardView[] = []; // Array to hold deck cardviews
-    private _poolCount: number = 0; // Count of pool cards
-    private _deckCount: number = 0; // Count of deck cards
-    private _poolScrollBox!: ScrollBox;
-    private _deckScrollBox!: ScrollBox;
-    private _isSBMoving: boolean = false;
-    private _isCardClicked: boolean = false;
-    private _maxDeckCards: number = 10; // Maximum number of cards in the deck
-    private _leaderCount: number = 0; // Count of leader cards in the deck
-    private _legendaryCount: number = 0; // Count of legendary cards in the deck
-    private _rareCount: number = 0; // Count of rare cards in the deck
-    private _commonCount: number = 0; // Count of common cards in the deck
+export class DeckView {
+  private readonly selected = new Set<Card>();
+  private readonly cards = Object.values(CharacterList)
+    .filter(character => character.availabilityType === AvailabilityType.Playable)
+    .map(character => character.unitType === UnitType.Leader ? new LeaderCard(character) : new Card(character));
+  private readonly tiles = new Map<Card, { tile: HTMLElement; action: HTMLButtonElement; reason: HTMLElement }>();
+  private readonly search: HTMLInputElement;
+  private readonly unit: HTMLSelectElement;
+  private readonly cardClass: HTMLSelectElement;
+  private readonly rarity: HTMLSelectElement;
+  private readonly details: HTMLDialogElement;
+  private readonly toggle: HTMLButtonElement;
+  private readonly confirm: HTMLButtonElement;
+  private readonly status: HTMLElement;
+  private busy = false;
 
-    constructor(app: Application) {
-        super();
-        this._poolContainer = new Container({ label: "PoolContainer" });
-        this.addChild(this._poolContainer);
+  constructor(private readonly root: HTMLElement, startMatch: (deck: Deck) => Promise<void>) {
+    this.search = root.querySelector("#card-search")!;
+    this.unit = root.querySelector("#card-unit")!;
+    this.cardClass = root.querySelector("#card-class")!;
+    this.rarity = root.querySelector("#card-rarity")!;
+    this.details = root.querySelector("#card-details")!;
+    this.toggle = root.querySelector("#deck-toggle")!;
+    this.confirm = root.querySelector("#confirm-deck")!;
+    this.status = root.querySelector("#deck-status")!;
+    const panel = root.querySelector("#deck-panel")!;
 
-        this._deckContainer = new Container({ label: "DeckContainer" });
-        this.addChild(this._deckContainer);
+    for (const type of Object.values(ClassType)) this.cardClass.add(new Option(classNames[type], type));
+    for (const rarity of Object.values(Rarity)) this.rarity.add(new Option(rarityNames[rarity], rarity));
 
-        this.init();
-
-        app.stage.addChild(this);
+    const grid = root.querySelector("#card-grid")!;
+    for (const card of this.cards) grid.append(this.createTile(card));
+    const sortField = root.querySelector<HTMLSelectElement>("#card-sort")!;
+    const directionButton = root.querySelector<HTMLButtonElement>("#sort-direction")!;
+    let ascending = true;
+    const sortCards = () => {
+      const field = sortField.value;
+      const sorted = [...this.cards].sort((a, b) => {
+        const byName = a.name.localeCompare(b.name, "tr");
+        const difference = field === "attack" ? a.attack - b.attack
+          : field === "health" ? a.health - b.health : byName;
+        return (ascending ? difference : -difference) || byName;
+      });
+      for (const card of sorted) grid.append(this.tiles.get(card)!.tile);
+    };
+    sortField.addEventListener("change", sortCards);
+    directionButton.addEventListener("click", () => {
+      ascending = !ascending;
+      const direction = ascending ? "Artan" : "Azalan";
+      directionButton.textContent = ascending ? "↑" : "↓";
+      directionButton.setAttribute("aria-label", "Sıralama yönü: " + direction);
+      directionButton.title = direction + " sıralama";
+      sortCards();
+    });
+    sortCards();
+    this.search.addEventListener("input", () => this.filter());
+    for (const filter of [this.unit, this.cardClass, this.rarity]) {
+      filter.addEventListener("change", () => this.filter());
     }
 
-    public init(): void {
-        this._deckScrollBox = new ScrollBox({
-            width: 900,
-            height: 920,
-            background: 0xffffff,
-            radius: 15,
-            elementsMargin: 50,
-            leftPadding: 175,
-            rightPadding: -80,
-            topPadding: 170,
-            bottomPadding: -60,
-            globalScroll: false,
-            dragTrashHold: 10,
-        });
-        this._deckScrollBox.label = "DeckScrollBox";
-        this._deckScrollBox.position.set(40, 80);
-        this._deckContainer.addChild(this._deckScrollBox);
+    const setPanelOpen = (expanded: boolean) => {
+      panel.classList.toggle("is-open", expanded);
+      this.toggle.setAttribute("aria-expanded", String(expanded));
+    };
+    this.toggle.addEventListener("click", () => {
+      setPanelOpen(!panel.classList.contains("is-open"));
+    });
+    document.addEventListener("click", event => {
+      if (event.target instanceof Node && !panel.contains(event.target) && !this.toggle.contains(event.target)) {
+        setPanelOpen(false);
+      }
+    });
 
-        this._poolScrollBox = new ScrollBox({
-            width: 900,
-            height: 920,
-            background: 0xffffff,
-            radius: 15,
-            elementsMargin: 50,
-            leftPadding: 175,
-            rightPadding: -80,
-            topPadding: 170,
-            bottomPadding: -60,
-            globalScroll: false,
-            dragTrashHold: 10,
+    this.confirm.addEventListener("click", async () => {
+      const leader = this.leader;
+      if (this.busy || this.selected.size !== deckSize || !leader) return;
+      this.busy = true;
+      this.render();
+      const deck = new Deck();
+      deck.setLeader(leader);
+      for (const card of this.selected) {
+        if (card !== leader) deck.addCard(card);
+      }
 
-        });
-        this._poolScrollBox.label = "PoolScrollBox";
-        this._poolScrollBox.position.set(980, 80);
-        this._poolContainer.addChild(this._poolScrollBox);
+      try {
+        await startMatch(deck);
+        this.busy = false;
+        this.render();
+      } catch (error) {
+        console.error(error);
+        this.busy = false;
+        this.render();
+        this.status.textContent = "Maç başlatılamadı. Tekrar deneyebilirsin.";
+      }
+    });
 
-        for (const character of Object.values(CharacterList)) {
-            const card = new Card(character);
-            const cardView = new CardView(card);
-            cardView.scale.set(0.8, 0.8);
+    this.filter();
+    this.render();
+  }
 
-            this._poolCards.push(cardView);
-            this._poolCount++;
-            this._poolScrollBox.addItem(cardView);
+  private get leader(): LeaderCard | undefined {
+    return [...this.selected].find(card => card instanceof LeaderCard) as LeaderCard | undefined;
+  }
 
-            this.orderPool();
+  private filter(): void {
+    const query = this.search.value.trim().toLowerCase();
+    let count = 0;
+    for (const [card, { tile }] of this.tiles) {
+      const visible = card.name.toLowerCase().includes(query)
+        && (!this.unit.value || card.unitType === this.unit.value)
+        && (!this.cardClass.value || card.classType === this.cardClass.value)
+        && (!this.rarity.value || card.rarity === this.rarity.value);
+      tile.hidden = !visible;
+      if (visible) count++;
+    }
+    this.root.querySelector("#collection-count")!.textContent = count + " / " + this.cards.length + " kart";
+    this.root.querySelector<HTMLElement>("#collection-empty")!.hidden = count > 0;
+  }
 
-            cardView.on("pointerdown", () => {
-                this._isCardClicked = true;
-            });
-            cardView.on("pointermove", () => {
-                if (this._isCardClicked) {
-                    this._isSBMoving = true;
-                }
-            });
-            cardView.on("pointerup", () => {
-                if (!this._isSBMoving && this._isCardClicked) {
-                    const isInPool = this._poolCards.includes(cardView);
-                    const isLeader = cardView.card.unitType === UnitType.Leader;
-                    const rarity = cardView.card.rarity;
+  private portrait(card: Card): HTMLImageElement {
+    const img = document.createElement("img");
+    img.src = import.meta.env.BASE_URL + "assets/characters/" + card.cover + ".png";
+    img.alt = "";
+    img.loading = "lazy";
+    return img;
+  }
 
-                    const canAddToDeck = this._deckCount < this._maxDeckCards
-                        && (!isLeader || this._leaderCount < ALLOWED_LEADER)
-                        && (
-                            (rarity === Rarity.Legendary && this._legendaryCount < ALLOWED_LEGENDARY) ||
-                            (rarity === Rarity.Rare && this._rareCount < ALLOWED_RARE) ||
-                            (rarity === Rarity.Common && this._commonCount < ALLOWED_COMMON)
-                        );
+  private createTile(card: Card): HTMLElement {
+    const tile = document.createElement("article");
+    tile.className = "collection-card";
+    tile.dataset.rarity = card.rarity;
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "card-action";
+    action.innerHTML = `
+      <div class="card-art">
+        <span class="card-badge"></span>
+        <small class="card-reason"></small>
+        <span class="card-mark" aria-hidden="true"></span>
+      </div>
+      <div class="card-caption">
+        <strong></strong>
+        <div class="card-meta"><span></span><span></span></div>
+        <div class="card-stats"><span></span><span></span></div>
+      </div>`;
+    action.querySelector(".card-art")!.prepend(this.portrait(card));
+    action.querySelector(".card-badge")!.textContent = card instanceof LeaderCard ? "♜ Lider" : rarityNames[card.rarity];
+    action.querySelector("strong")!.textContent = card.name;
+    const [cardClass, attackType] = action.querySelectorAll(".card-meta span");
+    cardClass.textContent = classNames[card.classType];
+    attackType.textContent = card.attackType === AttackType.Ranged ? "Menzilli" : "Yakın dövüş";
+    const [attack, health] = action.querySelectorAll(".card-stats span");
+    attack.textContent = "⚔ " + card.attack;
+    attack.setAttribute("aria-label", "Saldırı " + card.attack);
+    health.textContent = "♥ " + card.health;
+    health.setAttribute("aria-label", "Can " + card.health);
+    const reason = action.querySelector<HTMLElement>(".card-reason")!;
+    action.addEventListener("click", () => {
+      if (this.busy || action.getAttribute("aria-disabled") === "true") return;
+      if (!this.selected.delete(card)) this.selected.add(card);
+      this.render();
+    });
 
-                    if (isInPool) {
-                        if (canAddToDeck) {
-                            this._deckCards.push(cardView);
-                            this._deckCount++;
-                            this._deckScrollBox.addItem(cardView);
+    const info = document.createElement("button");
+    info.type = "button";
+    info.className = "card-info";
+    info.textContent = "i";
+    info.setAttribute("aria-label", card.name + " kart bilgisi");
+    info.addEventListener("click", () => {
+      this.details.querySelector("#detail-category")!.textContent = rarityNames[card.rarity] + " · " + classNames[card.classType];
+      this.details.querySelector("#detail-title")!.textContent = card.name;
+      this.details.querySelector("#detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
+      this.details.querySelector("#detail-health")!.textContent = `♥ Can ${card.health}`;
+      this.details.querySelector("#detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
+      this.details.querySelector("#detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
+      this.details.showModal();
+    });
+    tile.append(action, info);
+    this.tiles.set(card, { tile, action, reason });
+    return tile;
+  }
 
-                            this._poolCards = this._poolCards.filter(c => c !== cardView);
-                            this._poolCount--;
+  private deckEntry(card: Card, tag: "div" | "li"): HTMLElement {
+    const row = document.createElement(tag);
+    row.className = "deck-entry";
+    const name = document.createElement("strong");
+    name.textContent = card.name;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", card.name + " kartını çıkar");
+    remove.disabled = this.busy;
+    remove.addEventListener("click", () => {
+      this.selected.delete(card);
+      this.render();
+      this.tiles.get(card)?.action.focus({ preventScroll: true });
+    });
+    row.append(this.portrait(card), name, remove);
+    return row;
+  }
 
-                            this._deckCount === this._maxDeckCards && this.emit("DeckReady"); // Emit event when deck is ready
+  private render(): void {
+    const leader = this.leader;
+    const count = this.selected.size;
+    const units = [...this.selected].filter(card => card !== leader);
+    const rarityCounts = { [Rarity.Legendary]: 0, [Rarity.Rare]: 0, [Rarity.Common]: 0 };
+    for (const card of this.selected) rarityCounts[card.rarity]++;
 
-                            this.updateSelectableCards();
-                        } else {
-                            this.applySelectAnimation(cardView);
-
-                            this._isCardClicked = this._isSBMoving = false;
-                            return;
-                        }
-                    } else {
-                        this._poolCards.push(cardView);
-                        this._poolCount++;
-                        this._poolScrollBox.addItem(cardView);
-
-                        this._deckCards = this._deckCards.filter(c => c !== cardView);
-                        this._deckCount--;
-
-                        this._deckCount === this._maxDeckCards - 1 && this.emit("DeckUnready"); // Emit event when deck is unready
-
-                        this.updateSelectableCards();
-                    }
-
-                    this.orderPool();
-                    this.orderDeck();
-                    this.applySelectAnimation(cardView);
-
-                    this._isCardClicked = this._isSBMoving = false;
-                } else {
-                    this._isCardClicked = this._isSBMoving = false;
-                }
-            });
-        }
-
-        this._poolScrollBox.resize(true);
-        this._deckScrollBox.resize(true);
+    for (const [card, { tile, action, reason }] of this.tiles) {
+      const picked = this.selected.has(card);
+      const blocked = picked ? "" : count >= deckSize ? "Deste dolu"
+        : card instanceof LeaderCard && leader ? "Lider yuvası dolu"
+        : !(card instanceof LeaderCard) && units.length === deckSize - 1 ? "Birlik yuvaları dolu"
+        : rarityCounts[card.rarity] >= limits[card.rarity] ? "Nadirlik sınırı dolu" : "";
+      tile.classList.toggle("is-picked", picked);
+      action.setAttribute("aria-pressed", String(picked));
+      action.setAttribute("aria-disabled", String(this.busy || Boolean(blocked)));
+      action.setAttribute("aria-label", card.name + (blocked ? " · " + blocked : ""));
+      action.querySelector(".card-mark")!.textContent = picked ? "✓" : "";
+      reason.textContent = blocked || (picked ? "Destede" : "");
     }
 
-    private updateSelectableCards(): void {
-        this._deckCount = this._deckCards.length;
-        this._leaderCount = this._deckCards.filter(cardView => cardView.card.unitType === UnitType.Leader).length;
-        this._legendaryCount = this._deckCards.filter(cardView => cardView.card.rarity === Rarity.Legendary).length;
-        this._rareCount = this._deckCards.filter(cardView => cardView.card.rarity === Rarity.Rare).length;
-        this._commonCount = this._deckCards.filter(cardView => cardView.card.rarity === Rarity.Common).length;
-
-        this._poolCards.forEach(cardView => {
-            const isDisabled = this._deckCount >= this._maxDeckCards
-                || (cardView.card.unitType === UnitType.Leader && this._leaderCount >= ALLOWED_LEADER)
-                || (cardView.card.rarity === Rarity.Legendary && this._legendaryCount >= ALLOWED_LEGENDARY)
-                || (cardView.card.rarity === Rarity.Rare && this._rareCount >= ALLOWED_RARE)
-                || (cardView.card.rarity === Rarity.Common && this._commonCount >= ALLOWED_COMMON);
-
-            if (isDisabled) {
-                cardView.tint = 0x444444;
-            } else {
-                cardView.tint = 0xFFFFFF;
-            }
-        });
+    const leaderSlot = this.root.querySelector<HTMLElement>("#deck-leader")!;
+    leaderSlot.classList.toggle("empty-slot", !leader);
+    leaderSlot.replaceChildren(leader ? this.deckEntry(leader, "div") : "♜  Bir lider seç");
+    const list = this.root.querySelector("#deck-cards")!;
+    list.replaceChildren(...units.map(card => this.deckEntry(card, "li")));
+    if (units.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "empty-units";
+      empty.textContent = "Koleksiyondan birlik ekle.";
+      list.append(empty);
     }
 
-    private applySelectAnimation(cardView: CardView): void {
-        gsap.fromTo(cardView.scale, {
-            x: 0.7,
-            y: 0.7
-        }, {
-            x: 0.8,
-            y: 0.8,
-            duration: 0.3,
-            ease: "back.out(1.7)"
-        });
-    }
-
-    private orderPool(): void {
-        const order = [Rarity.Legendary, Rarity.Rare, Rarity.Common];
-
-        this._poolCards.sort((a, b) => {
-            return order.indexOf(a.card.rarity) - order.indexOf(b.card.rarity);
-        });
-
-        this._poolScrollBox.removeItems();
-        for (const cardView of this._poolCards) {
-            this._poolScrollBox.addItem(cardView);
-        }
-
-        this._deckScrollBox.resize(true);
-    }
-
-    private orderDeck(): void {
-        const order = [Rarity.Legendary, Rarity.Rare, Rarity.Common];
-
-        this._deckCards.sort((a, b) => {
-            return order.indexOf(a.card.rarity) - order.indexOf(b.card.rarity);
-        });
-
-        this._deckScrollBox.removeItems();
-        for (const cardView of this._deckCards) {
-            this._deckScrollBox.addItem(cardView);
-        }
-
-        this._poolScrollBox.resize(true);
-    }
-
-    public getDeckCards(): Deck {
-        const deck = new Deck();
-        const leaderCard = this._deckCards.find(cardView => cardView.card.unitType === UnitType.Leader);
-        
-        if (leaderCard) {
-            deck.setLeader(leaderCard.card as LeaderCard);
-        }
-
-        for (const cardView of this._deckCards.filter(c => c !== leaderCard)) {
-            deck.addCard(cardView.card);
-        }
-        return deck;
-    }
+    this.root.querySelector("#deck-count")!.textContent = count + " / " + deckSize;
+    this.root.querySelector<HTMLProgressElement>("#deck-progress")!.value = count;
+    this.root.querySelector("#deck-limits")!.textContent = "Efsanevi " + rarityCounts[Rarity.Legendary] + "/2 · Nadir " + rarityCounts[Rarity.Rare] + "/4";
+    this.toggle.textContent = "Destem · " + count + "/" + deckSize;
+    this.confirm.disabled = this.busy || count !== deckSize || !leader;
+    const missingUnits = deckSize - 1 - units.length;
+    const missing = [leader ? "" : "1 lider", missingUnits > 0 ? missingUnits + " birlik" : ""].filter(Boolean);
+    this.status.textContent = this.busy ? "Arena hazırlanıyor…" : missing.length ? missing.join(" ve ") + " daha seç." : "Desten hazır.";
+  }
 }

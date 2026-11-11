@@ -8,7 +8,7 @@ export interface IAbility {
   description: string;
 }
 
-export interface ILeaderCard{
+export interface ILeaderCard {
   card: ICard;
   crown: string;
 }
@@ -25,8 +25,8 @@ export interface ICard {
   unitType: UnitType;
   skill?: ISkill | null;
   activeEffects?: SkillEffect[];
-  skillUsedThisTurn?: boolean; // Yeni özellik, bu kartın bu turda skill kullanılıp kullanılmadığını saklar
-  maxHealth?: number; // Yeni özellik, başlangıç canını saklamak için
+  skillUsedThisTurn?: boolean;
+  maxHealth?: number;
 }
 
 export interface MoveOption {
@@ -40,4 +40,27 @@ export interface CombatOption {
   defender: CardView;
   attackDamage: number;
   counterDamage: number;
+}
+
+export enum AvailabilityType {
+  Playable = "playable",
+  SummonOnly = "summon_only",
+  All = "all"
+}
+
+export interface ICharacter {
+  name: string;
+  cover: string;
+  attack: number;
+  health: number;
+  rarity: Rarity;
+  color: Color;
+  attackType: AttackType;
+  classType: ClassType;
+  unitType: UnitType;
+  availabilityType: AvailabilityType;
+}
+
+export interface CharacterListType {
+  [key: string]: ICharacter;
 }

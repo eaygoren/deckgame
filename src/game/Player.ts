@@ -2,43 +2,56 @@ import { Card, LeaderCard } from "./Card";
 import { Deck } from "./Deck";
 
 export class Player {
-  public name: string;
-  public deck: Deck;
-  public hand: Card[] = [];
-  public leader: LeaderCard;
+  private _name: string;
+  private _deck: Deck;
+  private _team: Card[] = [];
+  private _hand: Card[] = [];
+  private _leader: LeaderCard;
 
   constructor(name: string, deck: Deck) {
-    this.name = name;
-    this.deck = deck;
+    this._name = name;
+    this._deck = deck;
 
     if (!deck.leader) throw new Error("Deck must have a leader");
 
-    this.leader = deck.leader;
-    this.hand = deck.getPlayableHand();
+    this._leader = deck.leader;
+    this._hand = deck.getPlayableHand();
+    this._team = [];
   }
 
-  public drawCard() {
-    if (this.hand.length >= 5) return;
-    // Draw a random card from the deck
-    const card = this.deck.drawRandomCard();
-    if (card) this.hand.push(card);
+  public get name(): string {
+    return this._name;
   }
 
-  public playTurn() {
-    // Remove the played card from hand
-    this.hand.splice(0, 1);
+  public get deck(): Deck {
+    return this._deck;
   }
 
-  public addCardToHand(card: Card): void {
-    if (this.hand.length < 5) {
-      this.hand.push(card);
-    }
+  public set deck(deck: Deck) {
+    this._deck = deck;
   }
 
-  public removeCardFromHand(card: Card): void {
-    const index = this.hand.indexOf(card);
-    if (index > -1) {
-      this.hand.splice(index, 1);
-    }
+  public get team(): Card[] {
+    return this._team;
+  }
+
+  public set team(cards: Card[]) {
+    this._team = cards;
+  }
+
+  public addToTeam(card: Card) {
+    this._team.push(card);
+  }
+
+  public get hand(): Card[] {
+    return this._hand;
+  }
+
+  public set hand(cards: Card[]) {
+    this._hand = cards;
+  }
+
+  public get leader(): LeaderCard {
+    return this._leader;
   }
 }

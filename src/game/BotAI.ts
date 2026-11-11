@@ -5,20 +5,7 @@ import { CardView } from "../ui/CardView";
 import { Card } from "./Card";
 
 export class BotAI {
-    private _combatManager: CombatManager;
-
-    private constructor() {
-        this._combatManager = CombatManager.getInstance();
-    }
-
-    public static getInstance(): BotAI {
-        if (!BotAI.instance) {
-            BotAI.instance = new BotAI();
-        }
-        return BotAI.instance;
-    }
-
-    private static instance: BotAI;
+    constructor(private readonly _combatManager: CombatManager) {}
 
     public findBestMove(attackers: CardView[], defenders: CardView[]): { attacker: Card; defender: Card } | null {
         const moves: MoveOption[] = [];
@@ -79,12 +66,12 @@ export class BotAI {
         const damageDealt = Math.min(attackDamage, defender.health);
 
         let score = 0;
-        let moveType = "unknown";
+        //let moveType = "unknown";
 
         // 1. ÖNCELİK: Düşman kartını öldür, ölme (mükemmel)
         if (attackerSurvives && defenderDies) {
             score = 10000 + (defender.attack * 200) + (defender.health * 50);
-            moveType = "Kill without dying";
+            //moveType = "Kill without dying";
 
             // Ranged attack bonusu (counter damage yok)
             if (attacker.attackType === AttackType.Ranged) {
@@ -106,7 +93,7 @@ export class BotAI {
         // 2. ÖNCELİK: Trading (düşman kartını öldür, ama sen de öl)
         else if (!attackerSurvives && defenderDies) {
             score = 5000 + (defender.attack * 150) + (defender.health * 30);
-            moveType = "Trading";
+            //moveType = "Trading";
 
             // Düşük değerli saldırgan ile trading yapılırsa bonus
             if (attacker.health <= 2) {
@@ -130,7 +117,7 @@ export class BotAI {
         // 3. ÖNCELİK: Öleceksin ama öldüremeyeceksin - maksimum hasar ver veya en değersiz kartı kullan
         else if (!attackerSurvives && !defenderDies) {
             score = 1000 + (damageDealt * 50);
-            moveType = "Sacrifice for damage";
+            //moveType = "Sacrifice for damage";
 
             // En değersiz kartı kullanma bonusu
             if (attacker.health <= 2 && attacker.attack <= 3) {
@@ -149,7 +136,7 @@ export class BotAI {
         // 4. ÖNCELİK: Güvenli hasar (hiç kimse ölmüyor)
         else if (attackerSurvives && !defenderDies) {
             score = 100 + (damageDealt * 10);
-            moveType = "Safe damage";
+            //moveType = "Safe damage";
 
             // Ranged bonus (güvenli hasar)
             if (attacker.attackType === AttackType.Ranged) {

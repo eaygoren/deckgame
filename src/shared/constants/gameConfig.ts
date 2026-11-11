@@ -24,6 +24,8 @@ export const Effects = {
     bleed: "bleed",
     burn: "burn",
     freeze: "freeze",
+    poison: "poison",
+    protection: "protection",
     zombify: "zombie",
 };
 

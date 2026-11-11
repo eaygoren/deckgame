@@ -1,59 +1,96 @@
-import { Application } from "pixi.js";
-import { AssetLoader } from "./utils/AssetLoader";
 import { Game } from "./game/Game";
 import { DeckView } from "./ui/DeckView";
+import { Deck } from "./game/Deck";
+import { Card, LeaderCard } from "./game/Card";
+import "./deck-builder.css";
+import "./battle.css";
 
-const app = new Application();
+const builder = document.querySelector<HTMLElement>("#deck-builder")!;
+const battle = document.querySelector<HTMLElement>("#app")!;
+const url = new URL(window.location.href);
 
-(async () => {
-  await AssetLoader.loadAll();
-  await app.init({
-    width: 1920,
-    height: 1080,
-    resolution: window.devicePixelRatio || 1,
-    //backgroundColor: 0x5c454d,
-    backgroundAlpha: 0,
-    resizeTo: window,
-  });
+document.addEventListener("dragstart", event => {
+  if (event.target instanceof HTMLImageElement) event.preventDefault();
+});
 
-  (globalThis as any).__PIXI_APP__ = app;
+document.addEventListener("click", event => {
+  const dialog = event.target;
+  if (dialog instanceof Element && !dialog.closest(".battle-panels, dialog")) {
+    document.querySelector<HTMLDetailsElement>(".battle-panels details[open]")?.removeAttribute("open");
+  }
+  if (!(dialog instanceof HTMLDialogElement) || !dialog.open) return;
 
-  document.getElementById("pixi-container")?.appendChild(app.canvas);
+  const { left, right, top, bottom } = dialog.getBoundingClientRect();
+  if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) {
+    dialog.close();
+  }
+});
 
-  // Update scale function to fit the game area
-  function updateScale() {
-    const scaleX = window.innerWidth / 1920;
-    const scaleY = window.innerHeight / 1080;
-    const scale = Math.min(scaleX, scaleY);
+if (import.meta.env.DEV && window.parent === window) {
+  builder.hidden = true;
+  void import("./ui/DevPreview").then(({ mountDevPreview }) => mountDevPreview(url));
+} else {
+  const desktopViewport = window.matchMedia("(min-width: 761px) and (min-height: 541px) and (pointer: fine)");
+  function resizeDesktopLayout(): void {
+    const previewMode = window.frameElement?.getAttribute("data-mode");
+    const desktop = previewMode ? previewMode === "desktop" : desktopViewport.matches;
+    const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    document.documentElement.style.setProperty("--desktop-scale", String(scale));
+    builder.classList.toggle("is-scaled", desktop);
+    battle.classList.toggle("is-scaled", desktop);
+  }
+  resizeDesktopLayout();
+  window.addEventListener("resize", resizeDesktopLayout);
+  desktopViewport.addEventListener("change", resizeDesktopLayout);
 
-    // Scale and center the stage
-    app.stage.scale.set(scale);
-    app.stage.position.set(
-      (window.innerWidth - 1920 * scale) / 2,
-      (window.innerHeight - 1080 * scale) / 2
-    );
+  const result = document.querySelector<HTMLDialogElement>("#match-result")!;
+  const resultTitle = result.querySelector("#match-result-title")!;
+  const showResultButton = document.querySelector<HTMLButtonElement>("#show-match-result")!;
+  const exitMatch = document.querySelector<HTMLDialogElement>("#exit-match")!;
+  let selectedDeck: Deck;
+  let activeGame: Game | undefined;
+
+  function startMatch(): void {
+    const deck = new Deck();
+    deck.setLeader(new LeaderCard(selectedDeck.leader));
+    for (const card of selectedDeck.cards) {
+      if (card !== selectedDeck.leader) deck.addCard(new Card(card));
+    }
+
+    result.close();
+    showResultButton.hidden = true;
+    activeGame = new Game(deck, won => {
+      battle.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach(dialog => dialog.close());
+      resultTitle.textContent = won ? "Kazandın!" : "Kaybettin";
+      result.dataset.outcome = won ? "win" : "loss";
+      showResultButton.hidden = false;
+      result.showModal();
+    });
+    activeGame.start();
+    builder.hidden = true;
+    battle.hidden = false;
+    window.scrollTo(0, 0);
   }
 
-  window.addEventListener("resize", updateScale);
-  updateScale();
+  showResultButton.addEventListener("click", () => result.showModal());
+  result.querySelector("#play-again")!.addEventListener("click", startMatch);
+  function returnToMenu(): void {
+    activeGame?.stop();
+    activeGame = undefined;
+    battle.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach(dialog => dialog.close());
+    battle.hidden = true;
+    builder.hidden = false;
+    builder.scrollTop = 0;
+    window.scrollTo(0, 0);
+    builder.querySelector("h1")?.focus({ preventScroll: true });
+  }
 
-  const playerDeck = new DeckView(app);
+  result.querySelector("#edit-match-deck")!.addEventListener("click", returnToMenu);
+  document.querySelector("#open-exit-match")!.addEventListener("click", () => exitMatch.showModal());
+  exitMatch.querySelector("#confirm-exit-match")!.addEventListener("click", returnToMenu);
 
-  const confirmDeckButton = document.getElementById("confirm-deck") as HTMLButtonElement;
-  confirmDeckButton.disabled = true; // Initially disable the button
-
-  playerDeck.on("DeckReady", () => {
-    confirmDeckButton.disabled = false;
+  new DeckView(builder, async deck => {
+    selectedDeck = deck;
+    startMatch();
   });
-  playerDeck.on("DeckUnready", () => {
-    confirmDeckButton.disabled = true;
-  });
-
-  confirmDeckButton?.addEventListener("click", () => {
-    confirmDeckButton.style.display = "none"; // Hide the button after confirming the deck
-    console.log("Deck confirmed:", playerDeck.getDeckCards());
-    // Start the game
-    new Game(app, playerDeck.getDeckCards()).start();
-    playerDeck.destroy(); // Destroy the deck view after starting the game
-  });
-})();
+}

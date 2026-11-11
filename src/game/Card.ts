@@ -52,6 +52,10 @@ export class Card implements ICard {
       return null;
     }
 
+    if (!target && this._skill.target) {
+      target = this._skill.target;
+    }
+
     const result = this._skill.execute(this, target, context);
     if (result.success) {
       this._skillUsedThisTurn = true;
@@ -75,6 +79,12 @@ export class Card implements ICard {
       case EffectType.Freeze:
         this._effectCover = Effects.freeze;
         break;
+      case EffectType.Poison:
+        this._effectCover = Effects.poison;
+        break;
+      case EffectType.Protection:
+        this._effectCover = Effects.protection;
+        break;
       case EffectType.Zombify:
         this._effectCover = Effects.zombify;
         break;
@@ -87,14 +97,25 @@ export class Card implements ICard {
 
   public removeEffect(effectType: EffectType): void {
     this._activeEffects = this._activeEffects.filter(e => e.type !== effectType);
+    if (effectType === EffectType.Protection && this._effectCover === Effects.protection) {
+      this._effectCover = undefined;
+    }
   }
 
   public hasEffect(effectType: EffectType): boolean {
     return this._activeEffects.some(e => e.type === effectType);
   }
 
+  public clearEffects(): void {
+    this._activeEffects = [];
+    this._effectCover = undefined;
+  }
+
   public async updateEffects(): Promise<void> {
     this._activeEffects = this._activeEffects.filter(effect => {
+      // Protection expires when its owner's next turn begins.
+      if (effect.type === EffectType.Protection) return true;
+
       effect.duration--;
 
       // Effect bittiğinde temizlik yap
@@ -110,6 +131,10 @@ export class Card implements ICard {
             break;
           case EffectType.Freeze:
             this.removeEffect(EffectType.Freeze);
+            this._effectCover = undefined;
+            break;
+          case EffectType.Poison:
+            this.removeEffect(EffectType.Poison);
             this._effectCover = undefined;
             break;
           case EffectType.Zombify:

@@ -1,4 +1,4 @@
-import { IAbility } from "../../shared/interfaces";
+import { IAbility } from "@/shared/interfaces";
 
 export class IronWallAbility implements IAbility {
     public name = "Iron Wall";

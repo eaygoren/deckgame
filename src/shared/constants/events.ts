@@ -7,6 +7,7 @@ export const BroadcastEvents = {
     RESET_INTERACTION: "restartgame",
     SHOW_ABILITY_MESSAGE: "showabilitymessage",
     SHOW_DAMAGE_ANIMATION: "showdamageanimation",
+    COMBAT_HIT: "combat-hit",
     CHECK_ARCANE_BLAST: "checkarcaneblast",
     ADD_NEW_CARDS: "addnewcards",
     NEW_CARDS_ADDED: "newcardsadded",

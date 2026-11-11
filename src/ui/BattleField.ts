@@ -1,110 +1,143 @@
-import { Container, ContainerChild, IRenderLayer, Sprite, Text } from "pixi.js";
+import { Turn } from "../shared/enums";
+import { BroadcastEvents } from "../shared/constants/events";
+import { Broadcast } from "../utils/Broadcast";
+import { battleCardMeta, CardView } from "./CardView";
+import { Card } from "../game/Card";
+import { Player } from "../game/Player";
+import { createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 
-export class BattleField extends Container {
-    private static instance: BattleField;
-    private _background!: Sprite;
-    private _playerField!: Container;
-    private _botField!: Container;
-    private _battleLog!: Container;
-    private _playerDeckText: Text | null = null;
-    private _botDeckText: Text | null = null;
+export class BattleField {
+  private readonly playerRow = document.querySelector<HTMLElement>("#player-cards")!;
+  private readonly botRow = document.querySelector<HTMLElement>("#bot-cards")!;
+  private readonly playerCount = document.querySelector<HTMLElement>("#player-deck-count")!;
+  private readonly botCount = document.querySelector<HTMLElement>("#bot-deck-count")!;
+  private readonly details = document.querySelector<HTMLDialogElement>("#battle-card-details")!;
+  private detailCard?: Card;
+  private readonly entries = document.querySelector<HTMLOListElement>("#battle-history-entries")!;
+  private readonly emptyHistory = document.querySelector<HTMLElement>("#battle-history-empty")!;
 
-    private constructor() {
-        super();
-    }
+  constructor(broadcast: Broadcast) {
+    this.playerRow.replaceChildren();
+    this.botRow.replaceChildren();
+    this.entries.replaceChildren();
+    this.emptyHistory.hidden = false;
+    document.querySelectorAll<HTMLDetailsElement>(".battle-panels details").forEach(panel => { panel.open = false; });
+    const history = this.entries.closest("details")!;
+    history.ontoggle = () => {
+      if (history.open) this.entries.scrollTop = this.entries.scrollHeight;
+    };
+    broadcast.on(BroadcastEvents.COMBAT_HIT, ({ source, target, damage, action, shared }: {
+      source: CardView; target: CardView; damage: number; action: string;
+      shared?: { name: string; damage: number };
+    }) => {
+      const split = shared?.damage ? ` ${shared.name} ${shared.damage} hasarı üstlendi.` : "";
+      this.addHistoryEntry(`${this.cardLabel(source)} → ${this.cardLabel(target)} · ${action} · ${damage} hasar.${split}`);
+    });
+    broadcast.on(BroadcastEvents.SHOW_ABILITY_MESSAGE, ({ targetView, sourceView, abilityName, message }: {
+      targetView?: CardView | null; sourceView?: CardView; abilityName?: string; message: string;
+    }) => {
+      const actor = sourceView ?? targetView;
+      const label = actor ? this.cardLabel(actor) + " · " : "";
+      this.addHistoryEntry(label + (abilityName ? abilityName + " · " : "") + message);
+    });
+  }
 
-    public static getInstance(): BattleField {
-        if (!BattleField.instance) {
-            BattleField.instance = new BattleField();
-        }
-        return BattleField.instance;
-    }
+  private cardLabel(view: CardView): string {
+    const side = this.playerRow.contains(view.element) ? "Sen" : "Rakip";
+    return `${view.card.name} (${side})`;
+  }
 
-    public showDeckCounts(playerCount: number, botCount: number) {
-        if (!this._background) {
-            this._background = Sprite.from("battlefield");
-            this._background.anchor.set(0.5, 0.5);
-            this._background.scale.set(1.65, 1.65);
-            this._background.position.set(960, 550);
-            this.addChild(this._background);
-        }
-        if (!this._playerField) {
-            this._playerField = new Container({ label: "PlayerField" });
-            this.addChild(this._playerField);
-        }
-        if (!this._botField) {
-            this._botField = new Container({ label: "BotField" });
-            this.addChild(this._botField);
-        }
-        if (!this._battleLog) {
-            this._battleLog = new Container({ label: "BattleLog" });
-            this.addChild(this._battleLog);
-        }
+  private addHistoryEntry(message: string): void {
+    const follow = this.entries.scrollHeight - this.entries.scrollTop <= this.entries.clientHeight + 12;
+    const item = document.createElement("li");
+    item.textContent = message;
+    this.entries.append(item);
+    this.emptyHistory.hidden = true;
+    if (follow) this.entries.scrollTop = this.entries.scrollHeight;
+  }
 
-        let playerDeckIcon = Sprite.from("deck");
-        playerDeckIcon.label = "PlayerDeckIcon";
-        playerDeckIcon.position.set(1845, 802);
-        playerDeckIcon.scale.x = -1;
-        playerDeckIcon.angle = 7;
-        playerDeckIcon.anchor.set(0.5, 0.5);
-        this._playerField.addChild(playerDeckIcon);
+  addCard(view: CardView, side: Turn): void {
+    const row = side === Turn.Player ? this.playerRow : this.botRow;
+    const next = [...row.children].find(child => Number((child as HTMLElement).dataset.slot) > view.slot);
+    row.insertBefore(view.element, next ?? null);
+    view.info.addEventListener("click", () => this.showCardDetails(view.card));
+    view.element.addEventListener("effectschange", () => {
+      if (this.details.open && this.detailCard === view.card) this.renderCardStatus(view.card);
+    });
+  }
 
-        this._playerDeckText = new Text({ text: playerCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
-        this._playerDeckText.label = "PlayerDeckText";
-        this._playerDeckText.position.set(1843, 800);
-        this._playerDeckText.anchor.set?.(0.5, 0.5);
-        this._playerField.addChild(this._playerDeckText);
+  private showCardDetails(card: Card): void {
+    this.details.querySelector("#battle-detail-title")!.textContent = card.name;
+    this.details.querySelector("#battle-detail-meta")!.textContent = battleCardMeta(card).join(" · ");
+    this.details.querySelector("#battle-detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
+    this.details.querySelector("#battle-detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
+    this.detailCard = card;
+    this.renderCardStatus(card);
+    this.details.showModal();
+  }
 
-        // Bot indicators
-        let botDeckIcon = Sprite.from("deck");
-        botDeckIcon.label = "BotDeckIcon";
-        botDeckIcon.position.set(1845, 250);
-        botDeckIcon.scale.x = -1;
-        botDeckIcon.angle = 7;
-        botDeckIcon.anchor.set(0.5, 0.5);
-        this._botField.addChild(botDeckIcon);
+  private renderCardStatus(card: Card): void {
+    this.details.querySelector("#battle-detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
+    this.details.querySelector("#battle-detail-health")!.textContent = `♥ Can ${Math.max(0, card.health)}`;
+    const fallen = card.health <= 0;
+    this.details.querySelector<HTMLElement>("#battle-detail-status")!.hidden = fallen;
+    const effects = fallen ? [] : card.activeEffects;
+    const entries = effects.map(effect => {
+      const badge = effectBadges[effect.type];
+      const entry = document.createElement("li");
+      const icon = createEffectBadge(badge);
+      icon.setAttribute("aria-hidden", "true");
 
-        this._botDeckText = new Text({ text: botCount, style: { fontSize: 45, fill: 0x000000, fontWeight: "bold" } });
-        this._botDeckText.label = "BotDeckText";
-        this._botDeckText.position.set(1843, 250);
-        this._botDeckText.anchor.set?.(0.5, 0.5);
-        this._botField.addChild(this._botDeckText);
-    }
+      const text = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = badge?.label ?? effect.type;
+      const details = document.createElement("small");
+      details.textContent = [effectDuration(effect), effectDetails(effect)].filter(Boolean).join(" · ");
+      text.append(title, details);
+      entry.append(icon, text);
+      return entry;
+    });
+    this.details.querySelector("#battle-detail-effects")!.replaceChildren(...entries);
+    this.details.querySelector<HTMLElement>("#battle-effects-empty")!.hidden = entries.length > 0;
+  }
 
-    public updateDeckCounts(playerCount: number, botCount: number) {
-        if (this._playerDeckText) {
-            this._playerDeckText.text = playerCount.toString();
-        }
-        if (this._botDeckText) {
-            this._botDeckText.text = botCount.toString();
-        }
-    }
+  updateCardPanels(player: Player, bot: Player): void {
+    this.playerCount.textContent = "Destede " + player.deck.cards.length;
+    this.botCount.textContent = "Destede " + bot.deck.cards.length;
+    const fallen = (side: Player) => side.team.filter(card =>
+      card.health <= 0 && !side.hand.includes(card) && !side.deck.cards.includes(card));
+    const deckRows = [...player.deck.cards]
+      .sort((a, b) => a.name.localeCompare(b.name, "tr"))
+      .map(card => this.cardPanelEntry(card));
+    const graveRows = [
+      ...fallen(player).map(card => this.cardPanelEntry(card, "Sen")),
+      ...fallen(bot).map(card => this.cardPanelEntry(card, "Rakip")),
+    ];
+    document.querySelector("#battle-deck-cards")!.replaceChildren(...deckRows);
+    document.querySelector("#battle-graveyard-cards")!.replaceChildren(...graveRows);
+    document.querySelector<HTMLElement>("#battle-deck-empty")!.hidden = deckRows.length > 0;
+    document.querySelector<HTMLElement>("#battle-graveyard-empty")!.hidden = graveRows.length > 0;
+  }
 
-    public addChildToPlayerField<U extends (ContainerChild | IRenderLayer)[]>(...children: U): void {
-        if (!this._playerField) {
-            this._playerField = new Container({ label: "PlayerField" });
-            this.addChild(this._playerField);
-        }
-        this._playerField.addChild(...children);
-    }
+  private cardPanelEntry(card: Card, side?: string): HTMLLIElement {
+    const entry = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("aria-haspopup", "dialog");
+    button.addEventListener("click", () => this.showCardDetails(card));
+    const portrait = document.createElement("img");
+    portrait.src = import.meta.env.BASE_URL + "assets/characters/" + card.cover + ".png";
+    portrait.alt = "";
+    portrait.loading = "lazy";
+    const label = document.createElement("span");
+    label.textContent = side ? `${card.name} (${side})` : `${card.name} · ⚔ ${card.attack} · ♥ ${card.health}`;
+    button.append(portrait, label);
+    entry.append(button);
+    return entry;
+  }
 
-    public addChildToBotField<U extends (ContainerChild | IRenderLayer)[]>(...children: U): void {
-        if (!this._botField) {
-            this._botField = new Container({ label: "BotField" });
-            this.addChild(this._botField);
-        }
-        this._botField.addChild(...children);
-    }
-
-    public get playerField(): Container {
-        return this._playerField;
-    }
-
-    public get botField(): Container {
-        return this._botField;
-    }
-
-    public get battleLog(): Container {
-        return this._battleLog;
-    }
+  setActiveSide(side: Turn | null): void {
+    this.playerRow.parentElement!.classList.toggle("is-active", side === Turn.Player);
+    this.botRow.parentElement!.classList.toggle("is-active", side === Turn.Bot);
+  }
 }

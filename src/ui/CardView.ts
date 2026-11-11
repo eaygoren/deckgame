@@ -1,249 +1,94 @@
-import { Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 import { Card } from "../game/Card";
-import { AttackType, ClassType, UnitType } from "../shared/enums";
-import { EFFECT_FILTERS, Environment } from "../shared/constants/gameConfig";
-import { AdjustmentFilter } from "pixi-filters";
-import { EffectType } from "../shared/interfaces/skillInterfaces";
+import { AttackType, Rarity, UnitType } from "../shared/enums";
+import { createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 
-export class CardView extends Container {
-  private _cardContainer!: Container; // Container for the card
-  private _skillContainer!: Container; // Container for the skill text area
-  private _descriptionContainer!: Container; // Container for the description text area
-  private _card: Card;
-  private _cover!: Sprite; // Cover image
-  private _effectCover!: Sprite; // Effect image
-  private _skillText!: Text; // Skill text reference
-  private _statText!: Text; // Stat text reference
-  private _attackType!: Sprite; // Attack type icon
-  private _descriptionText!: Text; // Skill description text
+export function battleCardMeta(card: Card): [string, string] {
+  return [
+    { Mage: "Büyücü", Rogue: "Haydut", Tank: "Tank", Warrior: "Savaşçı" }[card.classType],
+    card.attackType === AttackType.Ranged ? "Menzilli" : "Yakın dövüş",
+  ];
+}
 
-  constructor(card: Card) {
-    super();
-    this._card = card;
-    this.label = card.name;
-    this.interactive = true;
+export class CardView {
+  readonly element = document.createElement("article");
+  readonly action = document.createElement("button");
+  readonly info = document.createElement("button");
+  private readonly attack = document.createElement("span");
+  private readonly health = document.createElement("span");
+  private readonly healthBar = document.createElement("progress");
+  private readonly effects = document.createElement("div");
 
-    this.drawCard();
-  }
+  constructor(readonly card: Card, readonly slot: number) {
+    this.element.className = "collection-card battle-card";
+    this.element.dataset.rarity = card.rarity;
+    this.element.dataset.slot = String(slot);
+    this.element.style.setProperty("--card-column", String(slot + 1));
 
-  public get card(): Card {
-    return this._card;
-  }
+    this.action.type = "button";
+    this.action.className = "card-action";
+    const art = document.createElement("div");
+    art.className = "card-art";
+    const portrait = document.createElement("img");
+    portrait.src = import.meta.env.BASE_URL + "assets/characters/" + card.cover + ".png";
+    portrait.alt = "";
+    const badge = document.createElement("span");
+    badge.className = "card-badge";
+    badge.textContent = card.unitType === UnitType.Leader ? "♜ Lider"
+      : card.rarity === Rarity.Legendary ? "Efsanevi" : card.rarity === Rarity.Rare ? "Nadir" : "Yaygın";
+    this.effects.className = "battle-card-effects";
+    art.append(portrait, badge, this.effects);
 
-  private drawCard() {
-    this._skillContainer = new Container({ label: "SkillContainer" });
-    this.addChild(this._skillContainer);
+    const caption = document.createElement("div");
+    caption.className = "card-caption";
+    const name = document.createElement("strong");
+    name.textContent = card.name;
+    const meta = document.createElement("div");
+    meta.className = "card-meta";
+    const cardClass = document.createElement("span");
+    const attackType = document.createElement("span");
+    [cardClass.textContent, attackType.textContent] = battleCardMeta(card);
+    meta.append(cardClass, attackType);
+    const stats = document.createElement("div");
+    stats.className = "card-stats";
+    stats.append(this.attack, this.health);
+    this.healthBar.className = "battle-health";
+    this.healthBar.setAttribute("aria-label", "Can");
+    caption.append(name, meta, stats, this.healthBar);
+    this.action.append(art, caption);
 
-    // Create a container for the card
-    this._cardContainer = new Container({ label: "CardContainer" });
-    this.addChild(this._cardContainer);
-
-    const skillTextArea = new Graphics();
-    skillTextArea.beginPath();
-    skillTextArea.roundRect(-105, 230, 210, 45, 10);
-    skillTextArea.stroke({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, width: 3 });
-    skillTextArea.fill({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, alpha: 0.5 });
-    skillTextArea.closePath();
-    skillTextArea.label = "SkillTextArea";
-    this._skillContainer.addChild(skillTextArea);
-
-    let text = this.card.skill ? this.card.skill.name : "No Skill";
-    this._skillText = new Text({ text: text, style: { fontSize: 20, fill: 0x000000 } });
-    this._skillText.anchor.set(0.5);
-    this._skillText.position.set(0, 260);
-    this._skillText.label = "Skill";
-    this._skillContainer.addChild(this._skillText);
-
-    const mask = new Graphics();
-    mask.beginPath();
-    mask.roundRect(-130, -125, 260, 370, 20);
-    mask.fill({ color: 0x000000, alpha: 0.75 });
-    mask.closePath();
-    mask.label = "Mask";
-    this._cardContainer.addChild(mask);
-
-    this._cover = Sprite.from(this._card.cover);
-    this._cover.anchor.set(0.5, 1);
-    this._cover.scale.set(1);
-    this._cover.position.set(0, 245);
-    this._cover.label = "Cover";
-    this._cardContainer.addChild(this._cover);
-
-    this._effectCover = Sprite.from(Texture.EMPTY);
-    this._effectCover.anchor.set(0.5, 0.5);
-    this._effectCover.scale.set(1);
-    this._effectCover.position.set(0, 50);
-    this._effectCover.label = "EffectCover";
-    this._effectCover.visible = false; // Initially hidden
-    this._cardContainer.addChild(this._effectCover);
-
-    const seperator = new Graphics();
-    seperator.beginPath();
-    seperator.rect(-130, 155, 260, 120);
-    // seperator.stroke({ color: this._card instanceof LeaderCard ? Color.Leader : this._card.color, width: 8 });
-    seperator.fill({ color: 0x000000, alpha: 0.5 });
-    seperator.closePath();
-    seperator.label = "Seperator";
-    this._cardContainer.addChild(seperator);
-
-    this._descriptionContainer = new Container({ label: "DescriptionContainer" });
-    this._cardContainer.addChild(this._descriptionContainer);
-    this._descriptionContainer.visible = false;
-    this._descriptionContainer.alpha = 0;
-
-    const background = new Graphics();
-    background.beginPath();
-    background.roundRect(-130, -125, 260, 370, 20);
-    background.stroke({ color: /*this._card instanceof LeaderCard ? Color.Leader :*/ this._card.color, width: 10 });
-    background.closePath();
-    background.label = "Background";
-    this._cardContainer.addChild(background);
-
-    let attackTypeIcon: string;
-    switch (this._card.attackType) {
-      case AttackType.Melee:
-        attackTypeIcon = Environment.melee;
-        break;
-      case AttackType.Ranged:
-        attackTypeIcon = Environment.ranged;
-        break;
-    }
-
-    if (attackTypeIcon) {
-      this._attackType = Sprite.from(attackTypeIcon);
-      this._attackType.anchor.set(0.5, 0.5);
-      this._attackType.scale.set(1);
-      this._attackType.position.set(-95, 185);
-      this._attackType.label = "AttackTypeIcon";
-      this._cardContainer.addChild(this._attackType);
-    }
-
-    let classTypeIcon: string;
-    switch (this._card.classType) {
-      case ClassType.Tank:
-        classTypeIcon = Environment.tank;
-        break;
-      case ClassType.Warrior:
-        classTypeIcon = Environment.warrior;
-        break;
-      case ClassType.Mage:
-        classTypeIcon = Environment.mage;
-        break;
-      case ClassType.Rogue:
-        classTypeIcon = Environment.rogue;
-        break;
-    }
-
-    if (classTypeIcon) {
-      const classTypeSprite = Sprite.from(classTypeIcon);
-      classTypeSprite.anchor.set(0.5, 0.5);
-      classTypeSprite.scale.set(1);
-      classTypeSprite.position.set(95, 185);
-      classTypeSprite.label = "ClassTypeIcon";
-      this._cardContainer.addChild(classTypeSprite);
-    }
-
-    const nameText = new Text({ text: this._card.name, style: { fontFamily: "Arial", fontSize: 25, fill: 0xfafafa } });
-    nameText.anchor.set(0.5);
-    nameText.position.set(0, 185);
-    nameText.label = "Name";
-    this._cardContainer.addChild(nameText);
-
-    const crown = Sprite.from(Environment.crown);
-    crown.anchor.set(0.5, 0);
-    crown.scale.set(0.1);
-    crown.position.set(110, -185);
-    crown.angle = 15;
-    crown.label = "Crown";
-    crown.alpha = this._card.unitType === UnitType.Leader ? 1 : 0; // Only show crown for Leader cards
-    this.addChild(crown);
-
-    const descriptionBg = new Graphics();
-    descriptionBg.beginPath();
-    descriptionBg.rect(-125, -120, 250, 275);
-    descriptionBg.fill({ color: 0x000000, alpha: 0.5 });
-    descriptionBg.closePath();
-    descriptionBg.label = "DescriptionBackground";
-    this._descriptionContainer.addChild(descriptionBg);
-
-    this._descriptionText = new Text({
-      text: this._card.skill?.description,
-      style: {
-        fontFamily: "Arial",
-        align: "center",
-        fontSize: 25,
-        fill: 0xfafafa,
-        wordWrap: true,
-        wordWrapWidth: 230
-      }
-    });
-    this._descriptionText.anchor.set(0.5, 0);
-    this._descriptionText.position.set(0, -100);
-    this._descriptionText.label = "Description";
-    this._descriptionContainer.addChild(this._descriptionText);
-
-    this._cardContainer.mask = mask;
-
+    this.info.type = "button";
+    this.info.className = "card-info";
+    this.info.textContent = "i";
+    this.info.setAttribute("aria-label", card.name + " kart bilgisi");
+    this.element.append(this.action, this.info);
     this.updateStats();
   }
 
-  // Update method to refresh stats
-  public updateStats() {
-    if (this._statText) {
-      this._statText.destroy();
-    }
+  setState(state: "attacker" | "target" | "locked" | "frozen" | "idle", actionable: boolean): void {
+    this.element.dataset.state = state;
+    this.action.setAttribute("aria-disabled", String(!actionable));
+    this.action.setAttribute("aria-pressed", String(state === "attacker"));
+  }
 
-    // Stats text güncelleme
-    let attackText = `⚔️ ${this._card.attack}`;
+  updateStats(): void {
+    this.attack.textContent = "⚔ " + this.card.attack;
+    this.health.textContent = "♥ " + this.card.health;
+    this.healthBar.max = Math.max(1, this.card.maxHealth);
+    this.healthBar.value = this.card.health;
+    this.action.setAttribute("aria-label", this.card.name + ", saldırı " + this.card.attack + ", can " + this.card.health);
+    this.updateCover();
+  }
 
-    // Effect sisteminden bonus değerini al
-    if (this._card.classType === ClassType.Warrior && this._card.hasEffect(EffectType.WarriorRage)) {
-      const warriorRageEffect = this._card.activeEffects?.find(effect => effect.type === EffectType.WarriorRage);
-
-      if (warriorRageEffect && warriorRageEffect.value) {
-        const bonus = warriorRageEffect.value;
-        const originalAttack = this._card.attack - bonus;
-        attackText = `⚔️ ${originalAttack} + (${bonus})`;
-      }
-    }
-
-    this._statText = new Text({
-      text: `${attackText}  ❤️ ${this._card.health}`,
-      style: { fontSize: 25, fill: 0xfafafa }
+  updateCover(): void {
+    const badges = this.card.activeEffects.map(effect => {
+      const badge = effectBadges[effect.type];
+      const icon = createEffectBadge(badge);
+      const name = badge?.label ?? effect.type;
+      icon.title = [name, effectDuration(effect), effectDetails(effect)].filter(Boolean).join(" · ");
+      icon.setAttribute("aria-label", icon.title);
+      return icon;
     });
-    this._statText.anchor.set(0.5);
-    this._statText.position.set(0, 225);
-    this._statText.label = "Stats";
-    this._cardContainer.addChild(this._statText);
+    this.effects.replaceChildren(...badges);
+    this.element.dispatchEvent(new Event("effectschange"));
   }
-
-  public async updateCover() {
-    if (this._card.activeEffects && this._card.activeEffects.length > 0 && this._card.effectCover) {
-      for (const activeEffect of this._card.activeEffects) {
-        const effectType = activeEffect.type;
-
-        this._effectCover.texture = Texture.from(this._card.effectCover);
-        this._effectCover.visible = true;
-
-        // Filter uygula (her effect için)
-        const filterConfig = effectType in EFFECT_FILTERS ? EFFECT_FILTERS[effectType as keyof typeof EFFECT_FILTERS] : null;
-        this._cover.filters = filterConfig ? [new AdjustmentFilter(filterConfig)] : [];
-      }
-    } else {
-      this._effectCover.texture = Texture.EMPTY;
-      this._effectCover.visible = false;
-      this._cover.filters = [];
-    }
-  }
-
-  public get descriptionContainer(): Container {
-    return this._descriptionContainer;
-  }
-
-  // public updateAttackType(attackType: AttackType) {
-  //   if (this._attackType) {
-  //     this._card.attackType = attackType;
-  //     this._attackType.texture = Sprite.from(Environment[attackType]).texture;
-  //   }
-  // }
 }

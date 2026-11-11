@@ -1,5 +1,6 @@
 import { Card } from "../Card";
-import { ISkill, SkillTiming, CombatContext, SkillResult } from "../../shared/interfaces/skillInterfaces";
+import { ISkill, SkillTiming, CombatContext, SkillResult } from "@/shared/interfaces/skillInterfaces";
+import { Player } from "../Player";
 
 export abstract class BaseSkill implements ISkill {
     public abstract name: string;
@@ -22,8 +23,9 @@ export abstract class BaseSkill implements ISkill {
         };
     }
 
-    protected findLowestHpAlly(caster: Card, allAllies: Card[]): Card | null {
-        const allies = allAllies.filter(card => card !== caster && card.health > 0);
+    protected findLowestHpAlly(allAllies?: Card[]): Card | null {
+        const allies = allAllies?.filter(card => card.health > 0) || [];
+
         if (allies.length === 0) return null;
 
         return allies.reduce((lowest, current) =>
@@ -31,10 +33,33 @@ export abstract class BaseSkill implements ISkill {
         );
     }
 
-    protected findRandomAlly(caster: Card, allAllies: Card[]): Card | null {
-        const allies = allAllies.filter(card => card !== caster && card.health > 0);
+    protected findRandomAlly(caster: Card, allAllies?: Card[]): Card | null {
+        const allies = allAllies?.filter(card => card !== caster && card.health > 0) || [];
+
         if (allies.length === 0) return null;
 
         return allies[Math.floor(Math.random() * allies.length)];
+    }
+
+    protected findRandomDeadAlly(player?: Player): Card | null {
+        if (!player) return null;
+        const deadAllies = player.team.filter(card =>
+            card.health <= 0 && card !== player.leader &&
+            !player.hand.includes(card) && !player.deck.cards.includes(card)
+        );
+
+        if (deadAllies.length === 0) return null;
+
+        const randomDeadAlly = deadAllies[Math.floor(Math.random() * deadAllies.length)];
+
+        return randomDeadAlly;
+    }
+
+    protected findRandomEnemy(allEnemies?: Card[]): Card | null {
+        const enemies = allEnemies?.filter(card => card.health > 0) || [];
+
+        if (enemies.length === 0) return null;
+
+        return enemies[Math.floor(Math.random() * enemies.length)];
     }
 }
