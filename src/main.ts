@@ -61,7 +61,7 @@ if (import.meta.env.DEV && window.parent === window) {
     showResultButton.hidden = true;
     activeGame = new Game(deck, outcome => {
       battle.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach(dialog => dialog.close());
-      resultTitle.textContent = { win: "Kazandın!", loss: "Kaybettin", draw: "Berabere!" }[outcome];
+      resultTitle.textContent = { win: "You won!", loss: "You lost", draw: "Draw!" }[outcome];
       result.dataset.outcome = outcome;
       showResultButton.hidden = false;
       result.showModal();

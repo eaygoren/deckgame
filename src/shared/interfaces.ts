@@ -35,13 +35,11 @@ export interface MoveOption {
   score: number;
 }
 
-export interface CombatOption {
-  attacker: CardView;
-  defender: CardView;
-  attackDamage: number;
-  counterDamage: number;
-  followUp: boolean;
-}
+export type PlayStrike = (
+  attacker: CardView,
+  defender: CardView,
+  impact: () => number,
+) => void | Promise<void>;
 
 export enum AvailabilityType {
   Playable = "playable",

@@ -10,7 +10,7 @@ import { GenericSkill } from "./skills/GenericSkill";
 const copyableSkillTimings = new Set([SkillTiming.BeforeAttack, SkillTiming.AfterAttack, SkillTiming.OnKill]);
 const negativeEffects = new Set([
   EffectType.Bleed, EffectType.Burn, EffectType.Poison, EffectType.Freeze,
-  EffectType.Silence, EffectType.AttackReduction, EffectType.Mark, EffectType.Taunt,
+  EffectType.Silence, EffectType.AttackReduction, EffectType.Mark, EffectType.ThunderMark, EffectType.Taunt,
   EffectType.ZombifyPending, EffectType.VoidLock,
 ]);
 
@@ -64,8 +64,16 @@ export class Card implements ICard {
     return this.hasEffect(EffectType.PhoenixEgg);
   }
 
+  public get isOnLastHunt(): boolean {
+    return this.hasEffect(EffectType.LastHunt);
+  }
+
+  public get isAlive(): boolean {
+    return this.health > 0 || this.isOnLastHunt;
+  }
+
   public tryEnterPhoenixEgg(): boolean {
-    if (this.health > 0 || this.phoenixRebirthUsed || !this.passiveEffect(EffectType.PhoenixRebirth)) return false;
+    if (this.isAlive || this.phoenixRebirthUsed || !this.passiveEffect(EffectType.PhoenixRebirth)) return false;
 
     this.phoenixRebirthUsed = true;
     this.clearEffects();
@@ -102,7 +110,7 @@ export class Card implements ICard {
 
   public copySkillFrom(target: Card): ISkill | undefined {
     const original = target.skill;
-    if (this.health <= 0 || !this.passiveEffect(EffectType.SkillCopy)
+    if (!this.isAlive || !this.passiveEffect(EffectType.SkillCopy)
       || this.hasEffect(EffectType.SkillCopy) || target.isZombified
       || !(original instanceof GenericSkill) || !copyableSkillTimings.has(original.triggerTiming)) {
       return undefined;
@@ -141,6 +149,7 @@ export class Card implements ICard {
 
   // Effect yönetimi
   public addEffect(effect: SkillEffect): void {
+    if (this.blocksDebuff(effect.type)) return;
     this.removeEffect(effect.type);
     this._activeEffects.push(effect);
 
@@ -168,7 +177,8 @@ export class Card implements ICard {
 
   public removeEffect(effectType: EffectType): void {
     this._activeEffects = this._activeEffects.filter(e => e.type !== effectType);
-    if (effectType === EffectType.Protection && this._effectCover === Effects.protection) {
+    if ((effectType === EffectType.Protection && this._effectCover === Effects.protection)
+        || (effectType === EffectType.Freeze && this._effectCover === Effects.freeze)) {
       this._effectCover = undefined;
     }
   }
@@ -179,6 +189,10 @@ export class Card implements ICard {
 
   public get hasNegativeEffects(): boolean {
     return this._activeEffects.some(effect => negativeEffects.has(effect.type));
+  }
+
+  public blocksDebuff(type: EffectType): boolean {
+    return negativeEffects.has(type) && this.hasEffect(EffectType.DebuffImmunity);
   }
 
   public cleanseNegativeEffects(): void {
@@ -204,7 +218,9 @@ export class Card implements ICard {
     const wasEgg = this.isPhoenixEgg;
     this._activeEffects = this._activeEffects.filter(effect => {
       // These effects expire at separate turn boundaries.
-      if (effect.type === EffectType.Protection || effect.type === EffectType.Invisible || effect.type === EffectType.Mark) {
+      if (effect.type === EffectType.Protection || effect.type === EffectType.Invisible
+          || effect.type === EffectType.Mark || effect.type === EffectType.ThunderMark || effect.type === EffectType.Freeze
+          || effect.type === EffectType.DebuffImmunity || effect.type === EffectType.LastHunt) {
         return true;
       }
 
@@ -222,10 +238,6 @@ export class Card implements ICard {
             break;
           case EffectType.Burn:
             this.removeEffect(EffectType.Burn);
-            this._effectCover = undefined;
-            break;
-          case EffectType.Freeze:
-            this.removeEffect(EffectType.Freeze);
             this._effectCover = undefined;
             break;
           case EffectType.Poison:
@@ -261,7 +273,7 @@ export class Card implements ICard {
     this._unitType = zombie.unitType;
     this._attack = Math.floor(zombie.attack / 2);
     this._maxHealth = Math.floor(zombie.health / 2);
-    this._health = this._maxHealth;
+    this.health = this._maxHealth;
     this._skill = null;
     this.removeEffect(EffectType.PhoenixEgg);
     this.removeEffect(EffectType.SkillCopy);
@@ -312,7 +324,7 @@ export class Card implements ICard {
   }
 
   public set health(value: number) {
-    this._health = value;
+    if (!this.isOnLastHunt) this._health = value;
   }
 
   public get rarity(): Rarity {
@@ -367,7 +379,7 @@ export class Card implements ICard {
 
   public increaseHealth(amount: number): void {
     this._maxHealth += amount;
-    this._health += amount;
+    this.health += amount;
     this.maxHealthBonus += amount;
   }
 
@@ -382,16 +394,27 @@ export class Card implements ICard {
     this.removeEffect(EffectType.WarriorRage);
   }
 
-  public tickMark(activeTeam: Card[]): void {
-    const effect = this.activeEffects.find(effect => effect.type === EffectType.Mark);
-    if (effect?.source && activeTeam.includes(effect.source) && --effect.duration <= 0) {
-      this.removeEffect(EffectType.Mark);
+  public tickSourceTurnEffects(activeTeam: Card[]): void {
+    for (const effect of this.activeEffects) {
+      if ((effect.type === EffectType.Mark || effect.type === EffectType.ThunderMark || effect.type === EffectType.Freeze)
+          && effect.source && activeTeam.includes(effect.source) && --effect.duration <= 0) {
+        this.removeEffect(effect.type);
+      }
     }
   }
 
-  public tickInvisibility(): void {
-    const effect = this.activeEffects.find(effect => effect.type === EffectType.Invisible);
-    if (effect && --effect.duration <= 0) this.removeEffect(EffectType.Invisible);
+  public tickLastHunt(): void {
+    const hunt = this.activeEffects.find(effect => effect.type === EffectType.LastHunt);
+    if (hunt && --hunt.duration <= 0) this.removeEffect(EffectType.LastHunt);
+  }
+
+  public tickOpponentTurnEffects(): void {
+    for (const effect of this.activeEffects) {
+      if ((effect.type === EffectType.Invisible || effect.type === EffectType.DebuffImmunity)
+          && --effect.duration <= 0) {
+        this.removeEffect(effect.type);
+      }
+    }
   }
 
   public get maxHealth(): number {

@@ -1,5 +1,4 @@
 import gsap from "gsap";
-import { CombatOption } from "../shared/interfaces";
 import { BroadcastEvents } from "../shared/constants/events";
 import { CardView } from "../ui/CardView";
 import { Broadcast } from "../utils/Broadcast";
@@ -11,9 +10,6 @@ export class AnimationManager {
     broadcast.on(BroadcastEvents.SHOW_ABILITY_MESSAGE, ({ targetView, message, color }: {
       targetView?: CardView; message: string; color: number | string;
     }) => this.floatText(targetView, message, color, "battle-ability"));
-    broadcast.on(BroadcastEvents.SHOW_DAMAGE_ANIMATION, ({ targetView, damage }: {
-      targetView: CardView; damage: number;
-    }) => this.showDamage(targetView, damage));
   }
 
   private floatText(view: CardView | undefined, message: string, color: number | string, style: string): void {
@@ -37,22 +33,58 @@ export class AnimationManager {
     if (damage > 0) this.floatText(view, "−" + damage, "#ffd4ce", "battle-damage");
   }
 
-  async playAttack({ attacker, defender, attackDamage, counterDamage }: CombatOption): Promise<void> {
+  async playAttack(attacker: CardView, defender: CardView, impact: () => number): Promise<void> {
+    if (!attacker.element.isConnected || !defender.element.isConnected) {
+      impact();
+      return;
+    }
+    if (this.reducedMotion.matches) {
+      this.showDamage(defender, impact());
+      return;
+    }
+
     const from = attacker.element.getBoundingClientRect();
     const to = defender.element.getBoundingClientRect();
     const scale = from.width / attacker.element.offsetWidth;
-    const duration = this.reducedMotion.matches ? 0 : 0.24;
+    const duration = 0.24;
     attacker.element.classList.add("is-moving");
+    attacker.element.classList.remove("is-tilted");
     try {
-      await new Promise<void>(resolve => {
-        gsap.timeline({ onComplete: resolve })
+      await new Promise<void>((resolve, reject) => {
+        let finish = resolve;
+        gsap.timeline({ onComplete: () => finish() })
           .to(attacker.element, { x: (to.left - from.left) / scale, y: (to.top - from.top) / scale, duration, ease: "power2.in" })
-          .call(() => this.showDamage(defender, attackDamage))
-          .to(attacker.element, { x: 0, y: 0, duration, ease: "power2.out" })
-          .call(() => this.showDamage(attacker, counterDamage));
+          .call(() => {
+            try {
+              this.showDamage(defender, impact());
+            } catch (error) {
+              finish = () => reject(error);
+            }
+          })
+          .to(attacker.element, { x: 0, y: 0, duration, ease: "power2.out" });
       });
     } finally {
       attacker.element.classList.remove("is-moving");
+    }
+  }
+
+  async playBlockedCounter(defender: CardView): Promise<void> {
+    if (this.reducedMotion.matches || !defender.element.isConnected) return;
+
+    const element = defender.element;
+    element.classList.add("is-moving");
+    element.classList.remove("is-tilted");
+    try {
+      await new Promise<void>(resolve => {
+        gsap.to(element, {
+          keyframes: { x: [-4, 4, -2, 0] },
+          duration: 0.2,
+          ease: "none",
+          onComplete: resolve,
+        });
+      });
+    } finally {
+      element.classList.remove("is-moving");
     }
   }
 

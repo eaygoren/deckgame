@@ -21,25 +21,25 @@ export function mountDevPreview(url: URL): void {
   const shell = document.createElement("div");
   shell.className = "dev-preview";
   shell.innerHTML = `
-    <div class="dev-preview-toolbar" aria-label="Geliştirme önizlemesi" role="group">
+    <div class="dev-preview-toolbar" aria-label="Development preview" role="group">
       <button type="button" data-mode="desktop" aria-pressed="true">Desktop</button>
       <button type="button" data-mode="mobile" aria-pressed="false">Mobile</button>
-      <select aria-label="Çözünürlük"></select>
+      <select aria-label="Resolution"></select>
       <div class="dev-preview-mobile" hidden>
-        <select aria-label="Cihaz"></select>
+        <select aria-label="Device"></select>
         <button type="button" data-orientation="portrait" aria-pressed="true">Portrait</button>
         <button type="button" data-orientation="landscape" aria-pressed="false">Landscape</button>
       </div>
-      <output aria-label="Viewport boyutu"></output>
-      <button type="button" data-show-badges aria-haspopup="dialog">Rozetler</button>
+      <output aria-label="Viewport size"></output>
+      <button type="button" data-show-badges aria-haspopup="dialog">Badges</button>
     </div>
     <dialog aria-labelledby="dev-badges-title">
-      <form method="dialog"><button class="detail-close" aria-label="Kapat">×</button></form>
-      <h2 id="dev-badges-title">Aktif etki rozetleri</h2>
+      <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
+      <h2 id="dev-badges-title">Effect badges</h2>
       <ul class="dev-badge-list"></ul>
     </dialog>
     <div class="dev-preview-stage">
-      <iframe title="Oyun önizlemesi"></iframe>
+      <iframe title="Game preview"></iframe>
     </div>
   `;
 
@@ -57,7 +57,7 @@ export function mountDevPreview(url: URL): void {
   const stage = shell.querySelector<HTMLElement>(".dev-preview-stage")!;
   const mobileControls = shell.querySelector<HTMLElement>(".dev-preview-mobile")!;
   const deviceSelect = mobileControls.querySelector("select")!;
-  const resolutionSelect = shell.querySelector<HTMLSelectElement>('select[aria-label="Çözünürlük"]')!;
+  const resolutionSelect = shell.querySelector<HTMLSelectElement>('select[aria-label="Resolution"]')!;
   const dimensions = shell.querySelector("output")!;
   const modeButtons = shell.querySelectorAll<HTMLButtonElement>("[data-mode]");
   const orientationButtons = shell.querySelectorAll<HTMLButtonElement>("[data-orientation]");

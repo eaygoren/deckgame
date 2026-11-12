@@ -31,6 +31,7 @@ export interface CombatContext {
     damage?: number;
     dodged?: boolean;
     isCounterAttack?: boolean;
+    killedByCounterattack?: boolean;
     allPlayerCards?: Card[];
     allOpponentCards?: Card[];
     player?: Player;
@@ -67,9 +68,12 @@ export enum EffectType {
     Bleed = "bleed",
     Poison = "poison",
     Mark = "mark",
+    ThunderMark = "thunder_mark",
+    LastHunt = "last_hunt",
     Dodge = "dodge",
     Heal = "heal",
     Cleanse = "cleanse",
+    DebuffImmunity = "debuff_immunity",
     VoidLock = "void_lock",
     Buff = "buff",
     LifeSteal = "life_steal",

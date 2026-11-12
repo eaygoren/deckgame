@@ -3,7 +3,7 @@ import { Player } from "../game/Player";
 import { CharacterList } from "../shared/constants/characters";
 import { BroadcastEvents } from "../shared/constants/events";
 import { AttackType, ClassType, UnitType } from "../shared/enums";
-import { CombatOption } from "../shared/interfaces";
+import { PlayStrike } from "../shared/interfaces";
 import { CombatContext, EffectType, SkillTiming } from "../shared/interfaces/skillInterfaces";
 import { CardView } from "../ui/CardView";
 import { Broadcast } from "../utils/Broadcast";
@@ -12,15 +12,14 @@ export class CombatManager {
     private _player!: Player;
     private _opponent!: Player;
 
-    constructor(private readonly _broadcast: Broadcast, public readonly random: () => number = () => Math.random()) {
-        this.eventListeners();
-    }
+    constructor(
+        private readonly _broadcast: Broadcast,
+        public readonly random: () => number = () => Math.random(),
+        private readonly playStrike: PlayStrike = (_attacker, _defender, impact) => { impact(); },
+        private readonly playBlockedCounter: (defender: CardView) => void | Promise<void> = () => {}
+    ) {}
 
-    private eventListeners() {
-        this._broadcast.on(BroadcastEvents.CHECK_ARCANE_BLAST, this.handleMageAbility.bind(this));
-    }
-
-    public async resolveCombat(attacker: CardView, defender: CardView): Promise<CombatOption | null> {
+    public async resolveCombat(attacker: CardView, defender: CardView): Promise<{ followUp: boolean } | null> {
         if (!this.canAttackTarget(attacker.card, defender.card, this._opponent.hand)) return null;
 
         const context: CombatContext = {
@@ -36,7 +35,7 @@ export class CombatManager {
 
         const copiedSkill = attacker.card.readyCopiedSkill;
         const attackSkill = copiedSkill ?? attacker.card.skill;
-        const defenderWasAlive = defender.card.health > 0;
+        const defenderWasAlive = defender.card.isAlive;
         if (attackSkill?.triggerTiming === SkillTiming.BeforeAttack) {
             this.triggerAttackSkill(attacker, defender, context, SkillTiming.BeforeAttack, "#9932cc");
             attacker.updateStats();
@@ -44,31 +43,34 @@ export class CombatManager {
 
         const critChance = this.attackCritChance(attacker.card);
         const critical = critChance > 0 && this.random() <= critChance;
-        const combatData: CombatOption = {
-            attacker,
-            defender,
-            attackDamage: this.calculateAttackDamage(attacker, defender, critical),
-            followUp: false,
-            counterDamage: attacker.card.attackType === AttackType.Melee && !attacker.card.hasEffect(EffectType.Invisible)
-                ? this.calculateCounterDamage(defender.card, true) : 0
-        };
+        const attackDamage = this.calculateAttackDamage(attacker, defender, critical);
+        const meleeAttack = attacker.card.attackType === AttackType.Melee;
+        const counterBlocked = meleeAttack && (attacker.card.hasEffect(EffectType.Invisible)
+            || defender.card.hasEffect(EffectType.Freeze) || defender.card.isPhoenixEgg || defender.card.isOnLastHunt);
+        const counterDamage = meleeAttack && !counterBlocked ? this.calculateCounterDamage(defender.card, true) : 0;
 
-        // 6. Hasarları uygula (health'ler değişsin ama animation öncesi)
         const dodged = this.dodges(attacker.card, defender.card);
-        combatData.attackDamage = this.applyCombatDamage(attacker, defender, defender.card.amplifyIncomingDamage(combatData.attackDamage), "Saldırı", dodged);
+        await this.playStrike(attacker, defender, () =>
+            this.applyCombatDamage(attacker, defender, defender.card.amplifyIncomingDamage(attackDamage), "Attack", dodged));
+        const attackerWasAlive = attacker.card.isAlive;
         if (dodged && this.canCounterOnDodge(defender.card, attacker.card)) {
-            combatData.counterDamage = this.applyDodgeCounter(defender, attacker);
-        } else if (combatData.counterDamage > 0) {
+            await this.playDodgeCounter(defender, attacker);
+        } else if (counterDamage > 0) {
             const counterDodged = this.dodges(defender.card, attacker.card);
-            combatData.counterDamage = this.applyCombatDamage(defender, attacker, combatData.counterDamage,
-                "Karşı saldırı", counterDodged);
-            if (counterDodged) this.showDodgeCounter(attacker, defender);
+            await this.playStrike(defender, attacker, () =>
+                this.applyCombatDamage(defender, attacker, counterDamage, "Counterattack", counterDodged));
+            if (counterDodged) await this.playDodgeCounter(attacker, defender);
+        } else if (counterBlocked) {
+            await this.playBlockedCounter(defender);
+        } else if (dodged) {
+            await this.playDodgeCounter(defender, attacker);
         }
         context.dodged = dodged;
-        const killedDefender = defenderWasAlive && defender.card.health <= 0;
+        context.killedByCounterattack = attackerWasAlive && !attacker.card.isAlive;
+        const killedDefender = defenderWasAlive && !defender.card.isAlive;
 
         // 7. AfterAttack skills
-        if (attacker.card.health > 0 || attackSkill?.persistsAfterDeath) {
+        if (attacker.card.isAlive || attackSkill?.persistsAfterDeath) {
             this.triggerAttackSkill(attacker, defender, context, SkillTiming.AfterAttack, "#ff6600");
         }
 
@@ -81,21 +83,22 @@ export class CombatManager {
             this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
                 targetView: attacker,
                 abilityName: attacker.card.skill?.name,
-                message: `Kopyalanan yetenek: ${newCopy.name}`,
+                copiedAbilityName: newCopy.name,
+                message: `Copied ability: ${newCopy.name}`,
                 color: "#9932cc"
             });
         }
 
-        combatData.followUp = critical && !dodged && !killedDefender && attacker.card.health > 0
+        const followUp = critical && !dodged && !killedDefender && attacker.card.isAlive
             && Boolean(attacker.card.passiveEffect(EffectType.CriticalFollowUp))
             && this.canAttackTarget(attacker.card, defender.card, this._opponent.hand);
-        return combatData;
+        return { followUp };
     }
 
     public tryPhoenixRebirth(view: CardView): boolean {
         if (!view.card.tryEnterPhoenixEgg()) return false;
         this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-            targetView: view, abilityName: view.card.skill?.name, message: "Phoenix yumurtaya dönüştü!", color: "#ff6600"
+            targetView: view, abilityName: view.card.skill?.name, message: "Phoenix turned into an egg!", color: "#ff6600"
         });
         return true;
     }
@@ -104,11 +107,12 @@ export class CombatManager {
         const target = targetView.card;
         if (dodged) {
             this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-                targetView, message: "Saldırıdan kaçındı", color: "#52bd9b"
+                targetView, message: "Dodged the attack", color: "#52bd9b"
             });
             return 0;
         }
 
+        if (target.isOnLastHunt) damage = 0;
         const protector = this.ignoresDefense(source.card) ? undefined : this.livingProtector(target);
         let shared: { name: string; damage: number } | undefined;
         if (protector) {
@@ -135,7 +139,7 @@ export class CombatManager {
     }
 
     public canAttackTarget(attacker: Card | null, target: Card, opponents: Card[]): boolean {
-        if (target.health <= 0 || this.blocksInvisibleTarget(attacker, target, opponents)
+        if (!target.isAlive || (attacker && !attacker.isAlive) || this.blocksInvisibleTarget(attacker, target, opponents)
             || attacker?.isPhoenixEgg || attacker?.hasEffect(EffectType.Freeze)
             || (attacker && this.blocksRangedTarget(attacker, target, opponents))) {
             return false;
@@ -145,7 +149,7 @@ export class CombatManager {
             return target === provoker;
         }
         return target.unitType !== UnitType.Leader
-            || !opponents.some(card => card.health > 0 && card.unitType !== UnitType.Leader);
+            || !opponents.some(card => card.isAlive && card.unitType !== UnitType.Leader);
     }
 
     private blocksInvisibleTarget(attacker: Card | null, target: Card, opponents: Card[]): boolean {
@@ -153,7 +157,7 @@ export class CombatManager {
         if (!attacker || target.name !== CharacterList.Alien.name || target.unitType === UnitType.Leader) return true;
 
         const allies = opponents.filter(card =>
-            card !== target && card.health > 0 && card.unitType !== UnitType.Leader);
+            card !== target && card.isAlive && card.unitType !== UnitType.Leader);
         if (allies.length === 0) return false;
 
         const luxen = allies[0];
@@ -167,7 +171,7 @@ export class CombatManager {
         }
 
         if (target.unitType === UnitType.Leader || opponents.some(card =>
-            card !== target && card.health > 0 && card.unitType !== UnitType.Leader)) {
+            card !== target && card.isAlive && card.unitType !== UnitType.Leader)) {
             return true;
         }
 
@@ -176,12 +180,12 @@ export class CombatManager {
 
     private hasMeleeTargeting(target: Card, opponents: Card[]): boolean {
         return (this._player?.hand ?? []).some(card =>
-            card.attackType === AttackType.Melee && card.health > 0 && this.canAttackTarget(card, target, opponents));
+            card.attackType === AttackType.Melee && card.isAlive && this.canAttackTarget(card, target, opponents));
     }
 
     private getActiveProvoker(attacker: Card | null, opponents: Card[]): Card | undefined {
         const provoker = attacker?.activeEffects.find(effect => effect.type === EffectType.Taunt)?.source;
-        return provoker && provoker.health > 0 && opponents.includes(provoker) && !provoker.hasEffect(EffectType.Invisible)
+        return provoker && provoker.isAlive && opponents.includes(provoker) && !provoker.hasEffect(EffectType.Invisible)
             ? provoker : undefined;
     }
 
@@ -198,29 +202,38 @@ export class CombatManager {
         return chance > 0 && this.random() < chance;
     }
 
-    private canCounterOnDodge(source: Card, target: Card): boolean {
-        return source.health > 0 && target.health > 0
-            && !source.hasEffect(EffectType.Freeze) && !target.hasEffect(EffectType.Invisible)
-            && !target.passiveEffect(EffectType.RangedTargetImmunity)
+    private hasDodgeCounter(source: Card, target: Card): boolean {
+        return source.isAlive && target.isAlive
             && Boolean(source.passiveEffect(EffectType.Dodge)?.counterOnDodge);
+    }
+
+    private dodgeCounterBlocked(source: Card, target: Card): boolean {
+        return source.isOnLastHunt || source.hasEffect(EffectType.Freeze) || target.hasEffect(EffectType.Invisible)
+            || Boolean(target.passiveEffect(EffectType.RangedTargetImmunity));
+    }
+
+    private canCounterOnDodge(source: Card, target: Card): boolean {
+        return this.hasDodgeCounter(source, target) && !this.dodgeCounterBlocked(source, target);
     }
 
     private dodgeCounterDamage(source: Card, target: Card): number {
         return this.tankBlocks(source, target, AttackType.Ranged) ? Math.floor(source.attack / 2) : source.attack;
     }
 
-    private applyDodgeCounter(source: CardView, target: CardView): number {
-        return this.applyCombatDamage(source, target, this.dodgeCounterDamage(source.card, target.card),
-            "Menzilli karşı saldırı", this.dodges(source.card, target.card));
-    }
-
-    private showDodgeCounter(source: CardView, target: CardView): void {
-        if (!this.canCounterOnDodge(source.card, target.card)) return;
-        const damage = this.applyDodgeCounter(source, target);
-        this._broadcast.emit(BroadcastEvents.SHOW_DAMAGE_ANIMATION, { targetView: target, damage });
+    private async playDodgeCounter(source: CardView, target: CardView): Promise<void> {
+        if (!this.hasDodgeCounter(source.card, target.card)) return;
+        if (this.dodgeCounterBlocked(source.card, target.card)) {
+            await this.playBlockedCounter(source);
+            return;
+        }
+        const damage = this.dodgeCounterDamage(source.card, target.card);
+        const dodged = this.dodges(source.card, target.card);
+        await this.playStrike(source, target, () =>
+            this.applyCombatDamage(source, target, damage, "Ranged counterattack", dodged));
     }
 
     private previewDamage(source: Card, target: Card, damage: number): number {
+        if (target.isOnLastHunt) return 0;
         return this.ignoresDefense(source) ? damage : this.damageAfterProtection(target, damage);
     }
 
@@ -247,7 +260,7 @@ export class CombatManager {
             ? this.previewDamage(attacker, defender, defender.amplifyIncomingDamage(Math.floor(attacker.attack * 2 * reduction)))
             : null;
         const canCounter = attacker.attackType === AttackType.Melee && !attacker.hasEffect(EffectType.Invisible)
-            && !defender.isPhoenixEgg && !defender.hasEffect(EffectType.Freeze);
+            && !defender.isPhoenixEgg && !defender.isOnLastHunt && !defender.hasEffect(EffectType.Freeze);
         const counter = canCounter ? this.previewDamage(defender, attacker, this.calculateCounterDamage(defender)) : 0;
         const counterCritChance = canCounter ? defender.passiveEffect(EffectType.CritBoost)?.chance ?? 0 : 0;
         const counterCritical = counterCritChance > 0 ? this.previewDamage(defender, attacker, defender.attack * 2) : null;
@@ -341,11 +354,9 @@ export class CombatManager {
         }
     }
 
-    private handleMageAbility(data: { attacker: CardView, opponentCardViews: CardView[] }): void {
-        const { attacker, opponentCardViews } = data;
-
+    public async resolveArcaneBlast(attacker: CardView, opponentCardViews: CardView[]): Promise<void> {
         // IMPORTANT: Only apply if the attacker is actually a Mage
-        if (attacker.card.classType !== ClassType.Mage || attacker.card.isZombified || attacker.card.isPhoenixEgg || attacker.card.health <= 0) {
+        if (attacker.card.classType !== ClassType.Mage || attacker.card.isZombified || attacker.card.isPhoenixEgg || !attacker.card.isAlive) {
             //console.log(`ERROR: MageAbility called for non-Mage card: ${attacker.Name} (ClassType: ${attacker.ClassType})`);
             return;
         }
@@ -354,11 +365,11 @@ export class CombatManager {
         const randomTarget = this.getRandomOpponentTarget(attacker.card, opponentCardViews);
 
         const targetView = opponentCardViews.find(view => view.card === randomTarget);
-        if (targetView) {
-            const dodged = this.dodges(attacker.card, targetView.card);
-            const mageDamage = this.applyCombatDamage(attacker, targetView, Math.floor(attacker.card.attack * 0.5), "Arcane Blast", dodged);
-            if (dodged) this.showDodgeCounter(targetView, attacker);
+        if (!targetView) return;
 
+        const dodged = this.dodges(attacker.card, targetView.card);
+        await this.playStrike(attacker, targetView, () => {
+            const mageDamage = this.applyCombatDamage(attacker, targetView, Math.floor(attacker.card.attack * 0.5), "Arcane Blast", dodged);
             if (targetView.element.isConnected) {
                 this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
                     targetView,
@@ -366,14 +377,10 @@ export class CombatManager {
                     message: "Arcane Blast!",
                     color: 0x9966ff
                 });
-                setTimeout(() => {
-                    this._broadcast.emit(BroadcastEvents.SHOW_DAMAGE_ANIMATION, {
-                        targetView: targetView,
-                        damage: mageDamage
-                    });
-                }, 250);
             }
-        }
+            return mageDamage;
+        });
+        if (dodged) await this.playDodgeCounter(targetView, attacker);
     }
 
     private getRandomOpponentTarget(attacker: Card, opponentCardViews: CardView[]): Card | null {
@@ -381,7 +388,7 @@ export class CombatManager {
         const opponents = opponentCardViews.map(view => view.card);
         const provoker = this.getActiveProvoker(attacker, opponents);
         const availableTargets = opponents.filter(card =>
-            card.unitType !== UnitType.Leader && card.health > 0 && !this.blocksInvisibleTarget(attacker, card, opponents)
+            card.unitType !== UnitType.Leader && card.isAlive && !this.blocksInvisibleTarget(attacker, card, opponents)
             && !this.blocksRangedTarget(attacker, card, opponents)
             && (!provoker || card === provoker));
 
@@ -390,6 +397,34 @@ export class CombatManager {
         // Return random target
         const randomIndex = Math.floor(this.random() * availableTargets.length);
         return availableTargets[randomIndex];
+    }
+
+    public async resolveThunderMark(attacker: CardView, opponents: CardView[]): Promise<void> {
+        const skill = attacker.card.passiveEffect(EffectType.ThunderMark);
+        if (!skill || attacker.card.health <= 0) return;
+
+        const living = opponents.filter(view => view.card.isAlive);
+        if (living.length === 0) return;
+
+        const target = living[Math.floor(this.random() * living.length)];
+        const marked = target.card.activeEffects.some(effect =>
+            effect.type === EffectType.ThunderMark && effect.source === attacker.card);
+        await this.playStrike(attacker, target, () => {
+            const damage = this.applyCombatDamage(attacker, target, marked ? 2 : 1, "Lightning");
+            const canMark = target.card.isAlive && !target.card.blocksDebuff(EffectType.ThunderMark);
+            if (canMark) {
+                target.card.addEffect({
+                    type: EffectType.ThunderMark, target: target.card, source: attacker.card,
+                    duration: skill.duration ?? 2
+                });
+            }
+            this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+                sourceView: attacker, targetView: target, abilityName: attacker.card.skill?.name,
+                message: canMark ? `${target.card.name} was marked!` : `Lightning struck ${target.card.name}!`,
+                color: "#ffe0a0"
+            });
+            return damage;
+        });
     }
 
     private attackCritChance(card: Card): number {

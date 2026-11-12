@@ -79,6 +79,8 @@ export class GenericSkill extends BaseSkill {
         }
 
         const actualTarget = targetCard || caster;
+        const appliedType = effectConfig.type === EffectType.Zombify ? EffectType.ZombifyPending : effectConfig.type;
+        if (targetCard instanceof Card && targetCard.blocksDebuff(appliedType)) return { success: false };
 
         switch (effectConfig.type) {
             case EffectType.Invisible:
@@ -91,11 +93,19 @@ export class GenericSkill extends BaseSkill {
                 return this.applyZombify(actualTarget, effectConfig);
             case EffectType.Heal:
                 return this.applyHeal(caster, actualTarget, effectConfig);
-            case EffectType.Cleanse:
-                actualTarget.cleanseNegativeEffects();
+            case EffectType.Cleanse: {
+                const cleansed = actualTarget.hasNegativeEffects;
+                if (cleansed) actualTarget.cleanseNegativeEffects();
+                if (effectConfig.duration) {
+                    const immunity = { type: EffectType.DebuffImmunity, target: actualTarget, duration: effectConfig.duration };
+                    actualTarget.addEffect(immunity);
+                    const benefit = cleansed ? "was cleansed and gained" : "gained";
+                    return { success: true, message: `${actualTarget.name} ${benefit} debuff immunity!`, additionalEffects: [immunity] };
+                }
                 return { success: true, message: `${actualTarget.name}'s negative effects were removed!` };
+            }
             case EffectType.VoidLock:
-                if (actualTarget.health <= 0) return { success: false };
+                if (!actualTarget.isAlive) return { success: false };
                 actualTarget.removeStatBuffs();
                 return this.applyStatus(actualTarget, effectConfig, Infinity);
             case EffectType.Buff:
@@ -107,13 +117,17 @@ export class GenericSkill extends BaseSkill {
             case EffectType.AttackReduction:
                 return this.applyAttackReduction(actualTarget, effectConfig);
             case EffectType.Freeze:
-                return this.applyFreeze(actualTarget, effectConfig);
+                return this.applyFreeze(caster, actualTarget, effectConfig);
             case EffectType.Bleed:
                 return this.applyBleed(actualTarget, effectConfig);
             case EffectType.Poison:
                 return this.applyPoison(actualTarget, effectConfig);
             case EffectType.Mark:
                 return this.applyMark(caster, actualTarget, effectConfig);
+            case EffectType.LastHunt:
+                if (!context?.killedByCounterattack || caster.isAlive) return { success: false };
+                caster.addEffect({ type: EffectType.LastHunt, target: caster, duration: 2 });
+                return { success: true, message: `${caster.name} begins a last hunt!` };
             case EffectType.AttackCopy:
                 return this.applyAttackCopy(caster, target);
             case EffectType.StatSwap:
@@ -140,9 +154,9 @@ export class GenericSkill extends BaseSkill {
 
         if (targetName && Object.values(CharacterList).some(character => character.name === targetName)) {
             if (context?.player?.team.includes(caster)) {
-                return context.player.team.find(card => card.name === targetName && card.health > 0) || null;
+                return context.player.team.find(card => card.name === targetName && card.isAlive) || null;
             } else if (context?.opponent?.team.includes(caster)) {
-                return context?.opponent?.team.find(card => card.name === targetName && card.health > 0) || null;
+                return context?.opponent?.team.find(card => card.name === targetName && card.isAlive) || null;
             }
         }
 
@@ -156,8 +170,12 @@ export class GenericSkill extends BaseSkill {
             case TargetType.RandomAlly: {
                 const allies = context?.allPlayerCards;
                 if (effectConfig.type === EffectType.Cleanse) {
-                    const affectedAllies = allies?.filter(ally => ally.health > 0 && ally.hasNegativeEffects) ?? [];
-                    return affectedAllies[Math.floor((context?.random ?? Math.random)() * affectedAllies.length)] ?? null;
+                    const livingAllies = allies?.filter(ally => ally.isAlive) ?? [];
+                    const affectedAllies = livingAllies.filter(ally => ally.hasNegativeEffects);
+                    const eligible = affectedAllies.length || !effectConfig.duration
+                        ? affectedAllies
+                        : livingAllies.filter(ally => ally.unitType !== UnitType.Leader);
+                    return eligible[Math.floor((context?.random ?? Math.random)() * eligible.length)] ?? null;
                 }
                 const eligibleAllies = effectConfig.type === EffectType.Protection
                     ? allies?.filter(ally => ally.unitType !== UnitType.Leader)
@@ -231,7 +249,7 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyHeal(caster: Card, target: Card, config: EffectConfig): SkillResult {
-        if (target.blocksStatRecovery) return { success: false };
+        if (target.blocksStatRecovery || target.isOnLastHunt) return { success: false };
         const healAmount = config.useCasterAttack
             ? Math.floor(caster.attack * (config.value ?? 1))
             : config.value ?? 1;
@@ -312,23 +330,15 @@ export class GenericSkill extends BaseSkill {
         };
     }
 
-    private applyFreeze(target: Card, config: EffectConfig): SkillResult {
+    private applyFreeze(caster: Card, target: Card, config: EffectConfig): SkillResult {
         const effect: SkillEffect = {
             type: EffectType.Freeze,
-            target: target,
-            duration: config.duration || 1
+            target,
+            source: caster,
+            duration: (config.duration ?? 1) + 1
         };
 
-        if (target.addEffect) {
-            if (target.hasEffect(EffectType.Freeze) && target.activeEffects) {
-                const freezeEffect = target.activeEffects.find(effect => effect.type === EffectType.Freeze);
-                if (freezeEffect && typeof freezeEffect.duration === "number") {
-                    freezeEffect.duration++;
-                }
-            } else if (!target.hasEffect(EffectType.Freeze)) {
-                target.addEffect(effect);
-            }
-        }
+        target.addEffect(effect);
 
         return {
             success: true,
@@ -418,7 +428,7 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyStatSwap(target: Card): SkillResult {
-        if (!target || target.attack === undefined || target.health === undefined) {
+        if (!target || target.isOnLastHunt || target.attack === undefined || target.health === undefined) {
             return { success: false };
         }
 

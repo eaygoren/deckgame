@@ -132,7 +132,7 @@ export class BotAI {
         const counterDamage = Math.floor((preview.counter + (preview.counterCritical === null ? 0 :
             (preview.counterCritical - preview.counter) * preview.counterCritChance)) * (1 - preview.counterDodgeChance));
         const attackerTakesCounterDamage = attacker.attackType === AttackType.Melee;
-        const attackerWillDie = attackerTakesCounterDamage ? attacker.health <= counterDamage : false;
+        const attackerWillDie = attackerTakesCounterDamage && !attacker.isOnLastHunt && attacker.health <= counterDamage;
 
         if (attacker.unitType === UnitType.Leader && attackerWillDie) {
             return -10000; // Çok düşük skor ver, asla seçilmesin
@@ -141,8 +141,8 @@ export class BotAI {
         const attackDamage = Math.floor((preview.normal + (preview.critical === null ? 0 :
             (preview.critical - preview.normal) * preview.critChance)) * (1 - preview.dodgeChance));
 
-        const attackerSurvives = attackerTakesCounterDamage ? attacker.health > counterDamage : true;
-        const defenderDies = defender.health <= attackDamage;
+        const attackerSurvives = !attackerWillDie;
+        const defenderDies = !defender.isOnLastHunt && defender.health <= attackDamage;
         const damageDealt = Math.min(attackDamage, defender.health);
 
         let score = 0;

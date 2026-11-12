@@ -16,7 +16,7 @@ export const Characters = {
     // Dwarf: "Dwarf",
     Elf: "Elf", // Saldırıları kaçınmayı, hasar azaltmayı ve hasar paylaşımını aşar.
     Ent: "Ent", // Saldırı sonrası yalnızca vurduğu rakip 1 tur boyunca ancak Ent'e saldırabilir.
-    Ganesha: "Ganesha", // Sahada bir rakip turu geçirdikten sonra kendi turunun başında, diğer tur başı yeteneklerinden önce, rastgele bir yaşayan müttefikin tüm negatif etkilerini temizler. Kendisi ve lider seçilebilir. Enfeksiyonu temizler, tamamlanan zombileşmeyi geri almaz.
+    Ganesha: "Ganesha", // Sahada bir rakip turu geçirdikten sonra kendi turunun başında, negatif etkisi olan rastgele bir yaşayan müttefiki temizleyip bağışıklık verir. Temizlenecek hedef yoksa lider dışındaki rastgele bir yaşayan müttefike bağışıklık verir. Bağışıklık rakibin sonraki turu bitene kadar sürer.
     Gargoyle: "Gargoyle", // saldırmadığı her tur sonrası 1 tur boyunca taşlaşır ve 2 saldırı gücü kazanır, taşlaştığı tur saldırı yapamaz //TODO
     Ghost: "Ghost", // Öldüğünde yaşayan müttefik Reaper'a maksimum canı aşabilen 1 can verir.
     Gunslinger: "Gunslinger", // Saldırı sonrası hedefi işaretler. Hedef, işaretleyenin sonraki kendi turunun sonuna kadar normal saldırılardan %50 fazla hasar alır.
@@ -27,7 +27,7 @@ export const Characters = {
     Illusionist: "Illusionist", // Maçta bir kez, saldırı öncesinde hedefin görünen saldırısını ve mevcut canını takas eder.
     Joker: "Joker", // Saldırı öncesinde hedefin saldırısı daha yüksekse kendi saldırısını kalıcı olarak o değere yükseltir.
     Knight: "Knight", // Kendi turunun başında rastgele başka bir lider olmayan müttefiki, sonraki kendi turunun başına kadar korur. Gelen hasarın yarısına kadarını kalan canı ölçüsünde üstlenir. Kalan hasarı asıl hedef alır.
-    Lich: "Lich", // Saldırı ve karşı saldırı hasarı çözüldükten sonra hedefi 1 tur dondurur. Donmuş kart saldıramaz ve karşı saldırı yapamaz.
+    Lich: "Lich", // Saldırı ve karşı saldırı hasarı çözüldükten sonra hedefi, Lich'in takımının sonraki turu bitene kadar dondurur. Donmuş kart saldıramaz ve karşı saldırı yapamaz.
     Luxen: "Luxen", // Pasifi aktifken menzilli rakipler onu hedefleyemez. Susturulursa veya son normal kartken ona saldırabilecek yakın dövüşçü yoksa hedef alınabilir.
     // Medusa: "Medusa",
     Mimic: "Mimic", // İsabet eden normal saldırıda hedefin saldırı öncesi, saldırı sonrası veya öldürmede çalışan yeteneğini kopyalar. Kopya sonraki kendi turundaki normal saldırıda koşulu sağlanınca çalışır ve kullanıldığında ya da tur sonunda silinir.
@@ -50,9 +50,9 @@ export const Characters = {
     Skeleton: "Skeleton",
     Vampire: "Vampire", // Saldırıdan sağ çıkarsa kendi mevcut saldırısının yarısı kadar can yeniler.
     Void: "Void", // İsabet eden saldırı sonrası hayatta kalan hedefin stat güçlendirmelerini kaldırır. Etki temizlenene kadar hedef can yenileyemez veya yeni stat güçlendirmesi alamaz.
-    Werewolf: "Werewolf",
+    Werewolf: "Werewolf", // Maçta bir kez kendi saldırısında ölümcül karşı hasar alırsa 0 canla sahada kalır. Hasar almaz, can yenileyemez ve karşı saldırı yapamaz. Takımının sonraki turu sonunda zombileşmiş olsa bile ölür. Susturulabilir ve Mimic kopyalayabilir.
     Wukong: "Wukong", // Tank ve Warrior sınıf yeteneklerinin ikisini de taşır.
-    Zeus: "Zeus", // saldırdığı rakip ve leader dışındaki tüm kartlara 1 hasar verir //TODO
+    Zeus: "Zeus", // Normal saldırısı ve varsa Arcane Blast tamamlandığında hayattaysa lider dahil rastgele bir yaşayan rakibe yıldırım atar. Yıldırım 1 hasar verir, hedef Zeus tarafından işaretliyse 2 hasar verir. İşaret Zeus'un takımının sonraki turunun sonuna kadar sürer ve tekrar isabette yenilenir. Karşı saldırıda tetiklenmez.
     Zombie: "Zombie" // Saldırı sonrası hedefi enfekte eder. Hedef iki kendi turu sonra temel Zombie'nin yarı saldırısı ve yarı canıyla kalıcı olarak zombileşir. Dönüşüm kart ve sınıf yeteneklerini kapatır. Liderler ve Zombieler bağışıktır.
 };
 
@@ -552,8 +552,8 @@ export const CharacterList: CharacterListType = {
     Werewolf: {
         name: Characters.Werewolf,
         cover: Characters.Werewolf.toLowerCase(),
-        attack: 7,
-        health: 6,
+        attack: 5,
+        health: 5,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,

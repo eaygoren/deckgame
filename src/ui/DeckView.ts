@@ -1,13 +1,36 @@
 import { Card, LeaderCard } from "../game/Card";
 import { Deck } from "../game/Deck";
 import { CharacterList } from "../shared/constants/characters";
-import { ClassType, Rarity, UnitType } from "../shared/enums";
+import { AttackType, ClassType, Rarity, UnitType } from "../shared/enums";
 import { AvailabilityType } from "../shared/interfaces";
-import { cardClasses, cardTraitNames, classNames, renderCardTraitBadges } from "./cardTraits";
+import { attackTypeNames, cardClasses, classNames, createAttackTypeIcon, createClassIcon, createLeaderIcon, createRarityIcon, rarityNames, renderCardDetailTraits, renderCardHeader, renderCardTraitBadges } from "./cardTraits";
+import { addMouseTilt } from "./cardTilt";
+import { renderAbilityDescription } from "./abilityDescription";
+import { renderAbilityTitle } from "./abilityTitle";
 
 const deckSize = 10;
 const limits = { [Rarity.Legendary]: 2, [Rarity.Rare]: 4, [Rarity.Common]: deckSize };
-const rarityNames = { [Rarity.Legendary]: "Efsanevi", [Rarity.Rare]: "Nadir", [Rarity.Common]: "Yaygın" };
+
+function addIconFilterOptions<T extends string>(
+  select: HTMLSelectElement,
+  values: T[],
+  names: Record<T, string>,
+  createIcon: (value: T) => SVGSVGElement | undefined,
+): void {
+  const supportsOptionIcons = CSS.supports("appearance", "base-select");
+  if (supportsOptionIcons) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.append(document.createElement("selectedcontent"));
+    select.prepend(button);
+  }
+  for (const value of values) {
+    const option = new Option(names[value], value);
+    const icon = supportsOptionIcons ? createIcon(value) : undefined;
+    if (icon) option.append(icon);
+    select.add(option);
+  }
+}
 
 export class DeckView {
   private readonly selected = new Set<Card>();
@@ -18,6 +41,7 @@ export class DeckView {
   private readonly search: HTMLInputElement;
   private readonly unit: HTMLSelectElement;
   private readonly cardClass: HTMLSelectElement;
+  private readonly attackType: HTMLSelectElement;
   private readonly rarity: HTMLSelectElement;
   private readonly details: HTMLDialogElement;
   private readonly toggle: HTMLButtonElement;
@@ -29,6 +53,7 @@ export class DeckView {
     this.search = root.querySelector("#card-search")!;
     this.unit = root.querySelector("#card-unit")!;
     this.cardClass = root.querySelector("#card-class")!;
+    this.attackType = root.querySelector("#card-attack-type")!;
     this.rarity = root.querySelector("#card-rarity")!;
     this.details = root.querySelector("#card-details")!;
     this.toggle = root.querySelector("#deck-toggle")!;
@@ -36,8 +61,12 @@ export class DeckView {
     this.status = root.querySelector("#deck-status")!;
     const panel = root.querySelector("#deck-panel")!;
 
-    for (const type of Object.values(ClassType)) this.cardClass.add(new Option(classNames[type], type));
-    for (const rarity of Object.values(Rarity)) this.rarity.add(new Option(rarityNames[rarity], rarity));
+    addIconFilterOptions(this.unit, [UnitType.Leader, UnitType.Regular],
+      { [UnitType.Leader]: "Leader", [UnitType.Regular]: "Unit" },
+      type => type === UnitType.Leader ? createLeaderIcon() : undefined);
+    addIconFilterOptions(this.cardClass, Object.values(ClassType), classNames, createClassIcon);
+    addIconFilterOptions(this.attackType, Object.values(AttackType), attackTypeNames, createAttackTypeIcon);
+    addIconFilterOptions(this.rarity, Object.values(Rarity), rarityNames, createRarityIcon);
 
     const grid = root.querySelector("#card-grid")!;
     for (const card of this.cards) grid.append(this.createTile(card));
@@ -47,7 +76,7 @@ export class DeckView {
     const sortCards = () => {
       const field = sortField.value;
       const sorted = [...this.cards].sort((a, b) => {
-        const byName = a.name.localeCompare(b.name, "tr");
+        const byName = a.name.localeCompare(b.name, "en");
         const difference = field === "attack" ? a.attack - b.attack
           : field === "health" ? a.health - b.health : byName;
         return (ascending ? difference : -difference) || byName;
@@ -57,15 +86,15 @@ export class DeckView {
     sortField.addEventListener("change", sortCards);
     directionButton.addEventListener("click", () => {
       ascending = !ascending;
-      const direction = ascending ? "Artan" : "Azalan";
+      const direction = ascending ? "Ascending" : "Descending";
       directionButton.textContent = ascending ? "↑" : "↓";
-      directionButton.setAttribute("aria-label", "Sıralama yönü: " + direction);
-      directionButton.title = direction + " sıralama";
+      directionButton.setAttribute("aria-label", "Sort direction: " + direction);
+      directionButton.title = direction + " order";
       sortCards();
     });
     sortCards();
     this.search.addEventListener("input", () => this.filter());
-    for (const filter of [this.unit, this.cardClass, this.rarity]) {
+    for (const filter of [this.unit, this.cardClass, this.attackType, this.rarity]) {
       filter.addEventListener("change", () => this.filter());
     }
 
@@ -101,7 +130,7 @@ export class DeckView {
         console.error(error);
         this.busy = false;
         this.render();
-        this.status.textContent = "Maç başlatılamadı. Tekrar deneyebilirsin.";
+        this.status.textContent = "Could not start the match. Try again.";
       }
     });
 
@@ -120,11 +149,12 @@ export class DeckView {
       const visible = card.name.toLowerCase().includes(query)
         && (!this.unit.value || card.unitType === this.unit.value)
         && (!this.cardClass.value || cardClasses(card).some(type => type === this.cardClass.value))
+        && (!this.attackType.value || card.attackType === this.attackType.value)
         && (!this.rarity.value || card.rarity === this.rarity.value);
       tile.hidden = !visible;
       if (visible) count++;
     }
-    this.root.querySelector("#collection-count")!.textContent = count + " / " + this.cards.length + " kart";
+    this.root.querySelector("#collection-count")!.textContent = count + " / " + this.cards.length + " cards";
     this.root.querySelector<HTMLElement>("#collection-empty")!.hidden = count > 0;
   }
 
@@ -140,12 +170,13 @@ export class DeckView {
     const tile = document.createElement("article");
     tile.className = "collection-card";
     tile.dataset.rarity = card.rarity;
+    const face = document.createElement("div");
+    face.className = "collection-card-face";
     const action = document.createElement("button");
     action.type = "button";
     action.className = "card-action";
     action.innerHTML = `
       <div class="card-art">
-        <span class="card-badge"></span>
         <small class="card-reason"></small>
         <span class="card-mark" aria-hidden="true"></span>
       </div>
@@ -157,14 +188,14 @@ export class DeckView {
     const portrait = this.portrait(card);
     portrait.className = "card-portrait";
     action.prepend(portrait);
-    action.querySelector(".card-badge")!.textContent = card instanceof LeaderCard ? "♜ Lider" : rarityNames[card.rarity];
+    renderCardHeader(action.querySelector(".card-art")!, card);
     action.querySelector("strong")!.textContent = card.name;
     renderCardTraitBadges(action.querySelector(".card-meta")!, card);
     const [attack, health] = action.querySelectorAll(".card-stats span");
     attack.textContent = "⚔ " + card.attack;
-    attack.setAttribute("aria-label", "Saldırı " + card.attack);
+    attack.setAttribute("aria-label", "Attack " + card.attack);
     health.textContent = "♥ " + card.health;
-    health.setAttribute("aria-label", "Can " + card.health);
+    health.setAttribute("aria-label", "HP " + card.health);
     const reason = action.querySelector<HTMLElement>(".card-reason")!;
     action.addEventListener("click", () => {
       if (this.busy || action.getAttribute("aria-disabled") === "true") return;
@@ -176,17 +207,19 @@ export class DeckView {
     info.type = "button";
     info.className = "card-info";
     info.textContent = "i";
-    info.setAttribute("aria-label", card.name + " kart bilgisi");
+    info.setAttribute("aria-label", card.name + " card details");
     info.addEventListener("click", () => {
-      this.details.querySelector("#detail-category")!.textContent = [rarityNames[card.rarity], ...cardTraitNames(card)].join(" · ");
+      renderCardDetailTraits(this.details.querySelector("#detail-category")!, card);
       this.details.querySelector("#detail-title")!.textContent = card.name;
-      this.details.querySelector("#detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
-      this.details.querySelector("#detail-health")!.textContent = `♥ Can ${card.health}`;
-      this.details.querySelector("#detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
-      this.details.querySelector("#detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
+      this.details.querySelector("#detail-attack")!.textContent = `⚔ Attack ${card.attack}`;
+      this.details.querySelector("#detail-health")!.textContent = `♥ HP ${card.health}`;
+      renderAbilityTitle(this.details.querySelector("#detail-skill")!, card.skill?.name);
+      renderAbilityDescription(this.details.querySelector("#detail-description")!, card.skill?.description);
       this.details.showModal();
     });
-    tile.append(action, info);
+    face.append(action, info);
+    tile.append(face);
+    addMouseTilt(tile, face);
     this.tiles.set(card, { tile, action, reason });
     return tile;
   }
@@ -199,7 +232,7 @@ export class DeckView {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.textContent = "×";
-    remove.setAttribute("aria-label", card.name + " kartını çıkar");
+    remove.setAttribute("aria-label", "Remove " + card.name);
     remove.disabled = this.busy;
     remove.addEventListener("click", () => {
       this.selected.delete(card);
@@ -219,37 +252,37 @@ export class DeckView {
 
     for (const [card, { tile, action, reason }] of this.tiles) {
       const picked = this.selected.has(card);
-      const blocked = picked ? "" : count >= deckSize ? "Deste dolu"
-        : card instanceof LeaderCard && leader ? "Lider yuvası dolu"
-        : !(card instanceof LeaderCard) && units.length === deckSize - 1 ? "Birlik yuvaları dolu"
-        : rarityCounts[card.rarity] >= limits[card.rarity] ? "Nadirlik sınırı dolu" : "";
+      const blocked = picked ? "" : count >= deckSize ? "Deck is full"
+        : card instanceof LeaderCard && leader ? "Leader slot is full"
+        : !(card instanceof LeaderCard) && units.length === deckSize - 1 ? "Unit slots are full"
+        : rarityCounts[card.rarity] >= limits[card.rarity] ? "Rarity limit reached" : "";
       tile.classList.toggle("is-picked", picked);
       action.setAttribute("aria-pressed", String(picked));
       action.setAttribute("aria-disabled", String(this.busy || Boolean(blocked)));
       action.setAttribute("aria-label", card.name + (blocked ? " · " + blocked : ""));
       action.querySelector(".card-mark")!.textContent = picked ? "✓" : "";
-      reason.textContent = blocked || (picked ? "Destede" : "");
+      reason.textContent = blocked || (picked ? "In deck" : "");
     }
 
     const leaderSlot = this.root.querySelector<HTMLElement>("#deck-leader")!;
     leaderSlot.classList.toggle("empty-slot", !leader);
-    leaderSlot.replaceChildren(leader ? this.deckEntry(leader, "div") : "♜  Bir lider seç");
+    leaderSlot.replaceChildren(leader ? this.deckEntry(leader, "div") : "♜  Choose a leader");
     const list = this.root.querySelector("#deck-cards")!;
     list.replaceChildren(...units.map(card => this.deckEntry(card, "li")));
     if (units.length === 0) {
       const empty = document.createElement("li");
       empty.className = "empty-units";
-      empty.textContent = "Koleksiyondan birlik ekle.";
+      empty.textContent = "Add units from the collection.";
       list.append(empty);
     }
 
     this.root.querySelector("#deck-count")!.textContent = count + " / " + deckSize;
     this.root.querySelector<HTMLProgressElement>("#deck-progress")!.value = count;
-    this.root.querySelector("#deck-limits")!.textContent = "Efsanevi " + rarityCounts[Rarity.Legendary] + "/2 · Nadir " + rarityCounts[Rarity.Rare] + "/4";
-    this.toggle.textContent = "Destem · " + count + "/" + deckSize;
+    this.root.querySelector("#deck-limits")!.textContent = "Legendary " + rarityCounts[Rarity.Legendary] + "/2 · Rare " + rarityCounts[Rarity.Rare] + "/4";
+    this.toggle.textContent = "My deck · " + count + "/" + deckSize;
     this.confirm.disabled = this.busy || count !== deckSize || !leader;
     const missingUnits = deckSize - 1 - units.length;
-    const missing = [leader ? "" : "1 lider", missingUnits > 0 ? missingUnits + " birlik" : ""].filter(Boolean);
-    this.status.textContent = this.busy ? "Arena hazırlanıyor…" : missing.length ? missing.join(" ve ") + " daha seç." : "Desten hazır.";
+    const missing = [leader ? "" : "1 leader", missingUnits > 0 ? missingUnits + (missingUnits === 1 ? " unit" : " units") : ""].filter(Boolean);
+    this.status.textContent = this.busy ? "Preparing the arena…" : missing.length ? "Choose " + missing.join(" and ") + " to complete your deck." : "Your deck is ready.";
   }
 }

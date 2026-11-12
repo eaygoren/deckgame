@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8" />
@@ -11,46 +11,47 @@
     <main id="deck-builder" class="deck-builder">
         <header class="deck-header">
             <p class="deck-kicker">♜ &nbsp; DECK GAME</p>
-            <h1 tabindex="-1">Desteni kur</h1>
-            <p>Bir lider seç, yanına dokuz savaşçı al ve arenaya çık.</p>
+            <h1 tabindex="-1">Build your deck</h1>
+            <p>Choose a leader and nine units, then enter the arena.</p>
         </header>
         <div class="deck-layout">
             <section class="collection" aria-labelledby="collection-title">
                 <div class="collection-heading">
-                    <h2 id="collection-title">Kart koleksiyonu</h2>
+                    <h2 id="collection-title">Card collection</h2>
                     <span id="collection-count"></span>
                 </div>
                 <div class="collection-filters">
-                    <label>Arama<input id="card-search" type="search" placeholder="Kart adı ara"></label>
-                    <label>Kart türü<select id="card-unit"><option value="">Tümü</option><option value="Leader">Lider</option><option value="Regular">Normal</option></select></label>
-                    <label>Sınıf<select id="card-class"><option value="">Tümü</option></select></label>
-                    <label>Nadirlik<select id="card-rarity"><option value="">Tümü</option></select></label>
+                    <label>Search<input id="card-search" type="search" placeholder="Search by card name"></label>
+                    <label>Card type<select id="card-unit" class="icon-filter"><option value="">All</option></select></label>
+                    <label>Class<select id="card-class" class="icon-filter"><option value="">All</option></select></label>
+                    <label>Attack type<select id="card-attack-type" class="icon-filter"><option value="">All</option></select></label>
+                    <label>Rarity<select id="card-rarity" class="icon-filter"><option value="">All</option></select></label>
                     <div class="collection-sort">
-                        <label>Sıralama<select id="card-sort"><option value="name">İsim</option><option value="attack">Hasar</option><option value="health">Can</option></select></label>
-                        <button id="sort-direction" type="button" aria-label="Sıralama yönü: Artan" title="Artan sıralama">↑</button>
+                        <label>Sort by<select id="card-sort"><option value="name">Name</option><option value="attack">Attack</option><option value="health">HP</option></select></label>
+                        <button id="sort-direction" type="button" aria-label="Sort direction: Ascending" title="Ascending order">↑</button>
                     </div>
                 </div>
-                <p id="collection-empty" hidden>Bu filtrelere uyan kart bulunamadı.</p>
+                <p id="collection-empty" hidden>No cards match these filters.</p>
                 <div id="card-grid" class="card-grid"></div>
             </section>
             <aside id="deck-panel" class="deck-panel" aria-labelledby="deck-title">
                 <div class="collection-heading">
-                    <h2 id="deck-title">Destem</h2>
+                    <h2 id="deck-title">My deck</h2>
                     <strong id="deck-count" aria-live="polite"></strong>
                 </div>
-                <progress id="deck-progress" max="10" value="0" aria-label="Deste doluluğu"></progress>
-                <h3>Lider</h3>
+                <progress id="deck-progress" max="10" value="0" aria-label="Deck progress"></progress>
+                <h3>Leader</h3>
                 <div id="deck-leader"></div>
-                <h3>Birlikler</h3>
+                <h3>Units</h3>
                 <ul id="deck-cards" class="deck-cards"></ul>
                 <p id="deck-limits" class="deck-limits"></p>
                 <p id="deck-status" role="status"></p>
-                <button id="confirm-deck" type="button" disabled>Maça Başla <span aria-hidden="true">→</span></button>
+                <button id="confirm-deck" type="button" disabled>Start match <span aria-hidden="true">→</span></button>
             </aside>
         </div>
         <button id="deck-toggle" type="button" aria-controls="deck-panel" aria-expanded="false"></button>
         <dialog id="card-details" aria-labelledby="detail-title">
-            <form method="dialog"><button class="detail-close" aria-label="Kapat">×</button></form>
+            <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
             <p class="deck-kicker" id="detail-category"></p>
             <h2 id="detail-title"></h2>
             <p class="card-stats detail-stats"><span id="detail-attack"></span><span id="detail-health"></span></p>
@@ -60,49 +61,49 @@
     </main>
     <main id="app" class="battle-arena" hidden>
         <header class="battle-toolbar">
-            <button id="open-exit-match" type="button" aria-haspopup="dialog">Ana Menü</button>
+            <button id="open-exit-match" type="button" aria-haspopup="dialog">Main menu</button>
             <span id="battle-hint" role="status"></span>
-            <aside class="battle-panels" aria-label="Savaş panelleri">
+            <aside class="battle-panels" aria-label="Battle panels">
                 <details name="battle-panel">
-                    <summary>Savaş geçmişi</summary>
-                    <section class="battle-panel-content" aria-label="Savaş geçmişi">
-                        <h2>Savaş geçmişi</h2>
-                        <p id="battle-history-empty">Henüz bir savaş olayı yok.</p>
+                    <summary>Battle history</summary>
+                    <section class="battle-panel-content" aria-label="Battle history">
+                        <h2>Battle history</h2>
+                        <p id="battle-history-empty">No battle events yet.</p>
                         <ol id="battle-history-entries"></ol>
                     </section>
                 </details>
                 <details name="battle-panel">
-                    <summary>Deste</summary>
-                    <section class="battle-panel-content" aria-label="Kalan deste">
-                        <h2>Kalan desten</h2>
-                        <p id="battle-deck-empty">Destende kart kalmadı.</p>
+                    <summary>Deck</summary>
+                    <section class="battle-panel-content" aria-label="Remaining deck">
+                        <h2>Cards in your deck</h2>
+                        <p id="battle-deck-empty">Your deck is empty.</p>
                         <ul id="battle-deck-cards" class="battle-panel-cards"></ul>
                     </section>
                 </details>
                 <details name="battle-panel">
-                    <summary>Mezarlık</summary>
-                    <section class="battle-panel-content" aria-label="Mezarlık">
-                        <h2>Mezarlık</h2>
-                        <p id="battle-graveyard-empty">Henüz düşen kart yok.</p>
+                    <summary>Graveyard</summary>
+                    <section class="battle-panel-content" aria-label="Graveyard">
+                        <h2>Graveyard</h2>
+                        <p id="battle-graveyard-empty">No fallen cards yet.</p>
                         <ul id="battle-graveyard-cards" class="battle-panel-cards"></ul>
                     </section>
                 </details>
             </aside>
         </header>
         <section class="battle-side" aria-labelledby="bot-side-title">
-            <header><h2 id="bot-side-title">Rakip</h2><span id="bot-deck-count"></span></header>
+            <header><h2 id="bot-side-title">Opponent</h2><span id="bot-deck-count"></span></header>
             <div id="bot-cards" class="battle-row"></div>
         </section>
         <span id="battle-preview" role="tooltip" hidden></span>
         <section class="battle-side" aria-labelledby="player-side-title">
             <header>
-                <h2 id="player-side-title">Sen</h2>
+                <h2 id="player-side-title">You</h2>
                 <span id="player-deck-count"></span>
             </header>
             <div id="player-cards" class="battle-row"></div>
         </section>
         <dialog id="battle-card-details" aria-labelledby="battle-detail-title">
-            <form method="dialog"><button class="detail-close" aria-label="Kapat">×</button></form>
+            <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
             <h2 id="battle-detail-title"></h2>
             <p id="battle-detail-meta"></p>
             <p class="card-stats detail-stats">
@@ -113,28 +114,28 @@
             <p id="battle-detail-description"></p>
             <section id="battle-detail-status">
                 <div class="battle-effect-heading">
-                    <h3>Aktif etkiler</h3>
-                    <span>Kalan tur</span>
+                    <h3>Active effects</h3>
+                    <span>Turns left</span>
                 </div>
-                <p id="battle-effects-empty">Aktif etki yok.</p>
+                <p id="battle-effects-empty">No active effects.</p>
                 <ul id="battle-detail-effects"></ul>
             </section>
         </dialog>
-        <button id="show-match-result" type="button" aria-haspopup="dialog" hidden>Maç sonucu</button>
+        <button id="show-match-result" type="button" aria-haspopup="dialog" hidden>Match result</button>
         <dialog id="exit-match" aria-labelledby="exit-match-title" aria-describedby="exit-match-description">
-            <h2 id="exit-match-title">Ana menüye dön</h2>
-            <p id="exit-match-description">Çıkarsan bu maç sona erer. Seçtiğin deste korunur.</p>
+            <h2 id="exit-match-title">Return to main menu</h2>
+            <p id="exit-match-description">Leaving ends this match. Your selected deck is saved.</p>
             <form method="dialog" class="match-result-actions">
-                <button autofocus>Vazgeç</button>
-                <button id="confirm-exit-match" type="button">Ana Menüye Dön</button>
+                <button autofocus>Cancel</button>
+                <button id="confirm-exit-match" type="button">Return to main menu</button>
             </form>
         </dialog>
         <dialog id="match-result" aria-labelledby="match-result-title">
-            <form method="dialog"><button class="detail-close" aria-label="Kapat">×</button></form>
+            <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
             <h2 id="match-result-title"></h2>
             <div class="match-result-actions">
-                <button id="play-again" type="button" autofocus>Tekrar Oyna</button>
-                <button id="edit-match-deck" type="button">Desteyi Düzenle</button>
+                <button id="play-again" type="button" autofocus>Play again</button>
+                <button id="edit-match-deck" type="button">Edit deck</button>
             </div>
         </dialog>
     </main>

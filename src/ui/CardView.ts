@@ -1,8 +1,8 @@
 import { Card } from "../game/Card";
 import { EffectType } from "../shared/interfaces/skillInterfaces";
-import { Rarity, UnitType } from "../shared/enums";
 import { createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
-import { cardTraitNames, renderCardTraitBadges } from "./cardTraits";
+import { cardTraitNames, renderCardHeader, renderCardTraitBadges } from "./cardTraits";
+import { addMouseTilt } from "./cardTilt";
 
 export class CardView {
   readonly element = document.createElement("article");
@@ -27,12 +27,9 @@ export class CardView {
     art.className = "card-art";
     this.portrait.className = "card-portrait";
     this.portrait.alt = "";
-    const badge = document.createElement("span");
-    badge.className = "card-badge";
-    badge.textContent = card.unitType === UnitType.Leader ? "♜ Lider"
-      : card.rarity === Rarity.Legendary ? "Efsanevi" : card.rarity === Rarity.Rare ? "Nadir" : "Yaygın";
+    renderCardHeader(art, card);
     this.effects.className = "battle-card-effects";
-    art.append(badge, this.effects);
+    art.append(this.effects);
 
     const caption = document.createElement("div");
     caption.className = "card-caption";
@@ -46,7 +43,11 @@ export class CardView {
     this.info.type = "button";
     this.info.className = "card-info";
     this.info.textContent = "i";
-    this.element.append(this.action, this.info);
+    const face = document.createElement("div");
+    face.className = "collection-card-face";
+    face.append(this.action, this.info);
+    this.element.append(face);
+    addMouseTilt(this.element, face);
     this.updateStats();
   }
 
@@ -61,10 +62,10 @@ export class CardView {
     if (this.portrait.getAttribute("src") !== portrait) this.portrait.src = portrait;
     this.name.textContent = this.card.name;
     renderCardTraitBadges(this.meta, this.card);
-    this.info.setAttribute("aria-label", this.card.name + " kart bilgisi");
+    this.info.setAttribute("aria-label", this.card.name + " card details");
     this.attack.textContent = "⚔ " + this.card.attack;
     this.health.textContent = "♥ " + this.card.health;
-    this.action.setAttribute("aria-label", [this.card.name, ...cardTraitNames(this.card), "saldırı " + this.card.attack, "can " + this.card.health].join(", "));
+    this.action.setAttribute("aria-label", [this.card.name, ...cardTraitNames(this.card), "Attack " + this.card.attack, "HP " + this.card.health].join(", "));
     this.updateCover();
   }
 
@@ -78,6 +79,14 @@ export class CardView {
       icon.setAttribute("aria-label", icon.title);
       return icon;
     });
+    if (badges.length > 1) {
+      const label = `${badges.length} active effects`;
+      const overflow = createEffectBadge({ label, path: "M6 12h.01M12 12h.01M18 12h.01" });
+      overflow.classList.add("effect-overflow");
+      overflow.title = badges.map(badge => badge.title).join("\n");
+      overflow.setAttribute("aria-label", label);
+      badges.push(overflow);
+    }
     this.effects.replaceChildren(...badges);
     this.element.dispatchEvent(new Event("effectschange"));
   }

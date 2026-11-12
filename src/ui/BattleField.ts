@@ -2,10 +2,12 @@ import { Turn } from "../shared/enums";
 import { BroadcastEvents } from "../shared/constants/events";
 import { Broadcast } from "../utils/Broadcast";
 import { CardView } from "./CardView";
-import { cardTraitNames } from "./cardTraits";
+import { renderCardDetailTraits } from "./cardTraits";
 import { Card } from "../game/Card";
 import { Player } from "../game/Player";
 import { clockIconPath, createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
+import { renderAbilityDescription } from "./abilityDescription";
+import { renderAbilityTitle } from "./abilityTitle";
 
 export class BattleField {
   private readonly playerRow = document.querySelector<HTMLElement>("#player-cards")!;
@@ -31,27 +33,40 @@ export class BattleField {
       source: CardView; target: CardView; damage: number; action: string;
       shared?: { name: string; damage: number };
     }) => {
-      const split = shared?.damage ? ` ${shared.name} ${shared.damage} hasarı üstlendi.` : "";
-      this.addHistoryEntry(`${this.cardLabel(source)} → ${this.cardLabel(target)} · ${action} · ${damage} hasar.${split}`);
+      const split = shared?.damage ? ` ${shared.name} absorbed ${shared.damage} damage.` : "";
+      this.addHistoryEntry(`${this.cardLabel(source)} → ${this.cardLabel(target)} · ${action} · ${damage} damage.${split}`);
     });
-    broadcast.on(BroadcastEvents.SHOW_ABILITY_MESSAGE, ({ targetView, sourceView, abilityName, message }: {
-      targetView?: CardView | null; sourceView?: CardView; abilityName?: string; message: string;
+    broadcast.on(BroadcastEvents.SHOW_ABILITY_MESSAGE, ({ targetView, sourceView, abilityName, copiedAbilityName, message }: {
+      targetView?: CardView | null; sourceView?: CardView; abilityName?: string; copiedAbilityName?: string; message: string;
     }) => {
       const actor = sourceView ?? targetView;
       const label = actor ? this.cardLabel(actor) + " · " : "";
-      this.addHistoryEntry(label + (abilityName ? abilityName + " · " : "") + message);
+      const content: (Node | string)[] = [label];
+      if (abilityName) {
+        const title = document.createElement("span");
+        renderAbilityTitle(title, abilityName);
+        content.push(title, " · ");
+      }
+      if (copiedAbilityName && message.endsWith(copiedAbilityName)) {
+        const title = document.createElement("span");
+        renderAbilityTitle(title, copiedAbilityName);
+        content.push(message.slice(0, -copiedAbilityName.length), title);
+      } else {
+        content.push(message);
+      }
+      this.addHistoryEntry(...content);
     });
   }
 
   private cardLabel(view: CardView): string {
-    const side = this.playerRow.contains(view.element) ? "Sen" : "Rakip";
+    const side = this.playerRow.contains(view.element) ? "You" : "Opponent";
     return `${view.card.name} (${side})`;
   }
 
-  private addHistoryEntry(message: string): void {
+  private addHistoryEntry(...content: (Node | string)[]): void {
     const follow = this.entries.scrollHeight - this.entries.scrollTop <= this.entries.clientHeight + 12;
     const item = document.createElement("li");
-    item.textContent = message;
+    item.append(...content);
     this.entries.append(item);
     this.emptyHistory.hidden = true;
     if (follow) this.entries.scrollTop = this.entries.scrollHeight;
@@ -75,12 +90,12 @@ export class BattleField {
 
   private renderCardStatus(card: Card): void {
     this.details.querySelector("#battle-detail-title")!.textContent = card.name;
-    this.details.querySelector("#battle-detail-meta")!.textContent = cardTraitNames(card).join(" · ");
-    this.details.querySelector("#battle-detail-skill")!.textContent = card.skill?.name ?? "Özel yetenek";
-    this.details.querySelector("#battle-detail-description")!.textContent = card.skill?.description ?? "Bu kartın özel yeteneği yok.";
-    this.details.querySelector("#battle-detail-attack")!.textContent = `⚔ Hasar ${card.attack}`;
-    this.details.querySelector("#battle-detail-health")!.textContent = `♥ Can ${Math.max(0, card.health)}`;
-    const fallen = card.health <= 0;
+    renderCardDetailTraits(this.details.querySelector("#battle-detail-meta")!, card);
+    renderAbilityTitle(this.details.querySelector("#battle-detail-skill")!, card.skill?.name);
+    renderAbilityDescription(this.details.querySelector("#battle-detail-description")!, card.skill?.description);
+    this.details.querySelector("#battle-detail-attack")!.textContent = `⚔ Attack ${card.attack}`;
+    this.details.querySelector("#battle-detail-health")!.textContent = `♥ HP ${Math.max(0, card.health)}`;
+    const fallen = !card.isAlive;
     this.details.querySelector<HTMLElement>("#battle-detail-status")!.hidden = fallen;
     const effects = fallen ? [] : card.activeEffects;
     const entries = effects.map(effect => {
@@ -98,7 +113,7 @@ export class BattleField {
 
       const duration = document.createElement("span");
       duration.className = "battle-effect-duration";
-      const clock = createEffectBadge({ label: "Saat", path: clockIconPath });
+      const clock = createEffectBadge({ label: "Clock", path: clockIconPath });
       clock.classList.add("effect-clock");
       clock.setAttribute("aria-hidden", "true");
       const remaining = document.createElement("span");
@@ -113,16 +128,16 @@ export class BattleField {
   }
 
   updateCardPanels(player: Player, bot: Player): void {
-    this.playerCount.textContent = "Destede " + player.deck.cards.length;
-    this.botCount.textContent = "Destede " + bot.deck.cards.length;
+    this.playerCount.textContent = "In deck: " + player.deck.cards.length;
+    this.botCount.textContent = "In deck: " + bot.deck.cards.length;
     const fallen = (side: Player) => side.team.filter(card =>
-      card.health <= 0 && !side.hand.includes(card) && !side.deck.cards.includes(card));
+      !card.isAlive && !side.hand.includes(card) && !side.deck.cards.includes(card));
     const deckRows = [...player.deck.cards]
-      .sort((a, b) => a.name.localeCompare(b.name, "tr"))
+      .sort((a, b) => a.name.localeCompare(b.name, "en"))
       .map(card => this.cardPanelEntry(card));
     const graveRows = [
-      ...fallen(player).map(card => this.cardPanelEntry(card, "Sen")),
-      ...fallen(bot).map(card => this.cardPanelEntry(card, "Rakip")),
+      ...fallen(player).map(card => this.cardPanelEntry(card, "You")),
+      ...fallen(bot).map(card => this.cardPanelEntry(card, "Opponent")),
     ];
     document.querySelector("#battle-deck-cards")!.replaceChildren(...deckRows);
     document.querySelector("#battle-graveyard-cards")!.replaceChildren(...graveRows);

@@ -3,7 +3,7 @@ import { Deck } from "./Deck";
 import { Player } from "./Player";
 import { BattleField } from "../ui/BattleField";
 import { CardView } from "../ui/CardView";
-import { ClassType, Rarity, Turn, UnitType } from "../shared/enums";
+import { Rarity, Turn, UnitType } from "../shared/enums";
 import { CombatManager } from "../managers/CombatManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { Broadcast } from "../utils/Broadcast";
@@ -44,8 +44,10 @@ export class Game {
   constructor(playerDeck: Deck, private readonly onMatchEnded: (outcome: MatchOutcome) => void) {
     this._broadcast = new Broadcast();
     this._battlefield = new BattleField(this._broadcast);
-    this._combatManager = new CombatManager(this._broadcast);
     this._animationManager = new AnimationManager(this._broadcast);
+    this._combatManager = new CombatManager(this._broadcast, undefined,
+      (source, target, impact) => this._animationManager.playAttack(source, target, impact),
+      defender => this._animationManager.playBlockedCounter(defender));
     this._botAI = new BotAI(this._combatManager);
     this._player = this.createPlayer(playerDeck);
     this._bot = this.createBot();
@@ -56,6 +58,11 @@ export class Game {
   public start(): void {
     this._playerCardViews = this.mountHand(this._player, Turn.Player);
     this._botCardViews = this.mountHand(this._bot, Turn.Bot);
+    for (const view of [...this._playerCardViews, ...this._botCardViews]) {
+      if (view.card.name === CharacterList.Ganesha.name || view.card.name === CharacterList.Knight.name) {
+        this.cardsReadyForTurnStartSkill.add(view);
+      }
+    }
     this._battlefield.updateCardPanels(this._player, this._bot);
     this.startTurn();
   }
@@ -277,15 +284,15 @@ export class Game {
 
     const attacker = this._attacker.card;
     const { normal, critical, counter, counterCritical, critChance, counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter } = this._combatManager.previewCombat(attacker, target.card);
-    const parts = [target.card.name + " · Hasar " + normal];
-    if (critical !== null) parts.push(`Kritik ${critical} (%${critChance * 100})`);
-    if (dodgeChance > 0) parts.push(`Hedefin kaçınma şansı %${dodgeChance * 100}`);
-    if (dodgeCounter !== null) parts.push(`Kaçınırsa menzilli karşı hasar ${dodgeCounter}`);
-    parts.push("Karşı hasar " + counter);
-    if (counterCritical !== null) parts.push(`Karşı kritik ${counterCritical} (%${counterCritChance * 100})`);
-    if (counterDodgeChance > 0) parts.push(`Kaçınma şansı %${counterDodgeChance * 100}`);
-    if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("Yetenek değerleri değiştirebilir");
-    if (confirmWithTap) parts.push("Saldırmak için tekrar dokun");
+    const parts = [target.card.name + " · Damage " + normal];
+    if (critical !== null) parts.push(`Critical ${critical} (${critChance * 100}%)`);
+    if (dodgeChance > 0) parts.push(`Target dodge chance ${dodgeChance * 100}%`);
+    if (dodgeCounter !== null) parts.push(`Ranged counter damage on dodge ${dodgeCounter}`);
+    parts.push("Counter damage " + counter);
+    if (counterCritical !== null) parts.push(`Critical counter ${counterCritical} (${counterCritChance * 100}%)`);
+    if (counterDodgeChance > 0) parts.push(`Counter dodge chance ${counterDodgeChance * 100}%`);
+    if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("An ability may change these values");
+    if (confirmWithTap) parts.push("Tap again to attack");
     this.clearDamagePreview();
     this.preview.textContent = parts.join(" · ");
     this.preview.hidden = false;
@@ -300,10 +307,10 @@ export class Game {
     this.clearDamagePreview();
     const playerTurn = this._turn === Turn.Player;
     const choosingTarget = playerTurn && this._phase === "ready" && this._attacker !== null;
-    this.turnHint.textContent = this._phase === "finished" ? "Maç bitti"
-      : this._phase !== "ready" ? "Hamle sonuçlanıyor…"
-      : !playerTurn ? "Rakip düşünüyor…"
-      : choosingTarget ? "Bir hedef seç" : "Saldıracak kartı seç";
+    this.turnHint.textContent = this._phase === "finished" ? "Match ended"
+      : this._phase !== "ready" ? "Resolving the move…"
+      : !playerTurn ? "Opponent is thinking…"
+      : choosingTarget ? "Choose a target" : "Choose an attacker";
 
     const ready = playerTurn && this._phase === "ready";
     this._battlefield.setActiveSide(this._phase === "finished" ? null : this._turn);
@@ -368,7 +375,7 @@ export class Game {
         const opponent = this._turn === Turn.Player ? this._bot : this._player;
         for (const { card: attacker } of active()) {
           for (const { card: defender } of waiting()) {
-            if (attacker.health > 0 && this.canTarget(defender, opponent, attacker)) moves.push({ attacker, defender });
+            if (attacker.isAlive && this.canTarget(defender, opponent, attacker)) moves.push({ attacker, defender });
           }
         }
         return moves;
@@ -392,12 +399,13 @@ export class Game {
         const opponent = this._turn === Turn.Player ? this._bot : this._player;
         for (const { card: attacker } of active()) {
           for (const { card: defender } of waiting()) {
-            if (attacker.health <= 0 ||
+            if (!attacker.isAlive ||
                 (attacker.unitType !== UnitType.Leader && defender.unitType !== UnitType.Leader) ||
                 !this.canTarget(defender, opponent, attacker)) continue;
             if (defender.unitType === UnitType.Leader) return true;
             const preview = this._combatManager.previewCombat(attacker, defender);
-            if (Math.max(preview.counter, preview.counterCritical ?? 0, preview.dodgeCounter ?? 0) >= attacker.health) {
+            if (!attacker.isOnLastHunt &&
+                Math.max(preview.counter, preview.counterCritical ?? 0, preview.dodgeCounter ?? 0) >= attacker.health) {
               return true;
             }
           }
@@ -406,7 +414,8 @@ export class Game {
       },
       replyPriority: ({ attacker, defender }) => {
         const preview = this._combatManager.previewCombat(attacker, defender);
-        const lethal = preview.normal >= defender.health || (preview.critical ?? 0) >= defender.health;
+        const lethal = !defender.isOnLastHunt &&
+          (preview.normal >= defender.health || (preview.critical ?? 0) >= defender.health);
         const priority = lethal && defender.unitType === UnitType.Leader ? 20000 : 0;
         return priority + this._botAI.calculateMoveScore(attacker, defender);
       },
@@ -426,7 +435,7 @@ export class Game {
       _combatManager: combat,
       _botAI: new BotAI(combat),
       _battlefield: { updateCardPanels() {} },
-      _animationManager: { async playAttack() {}, async removeCards() {}, showNewCard() {} },
+      _animationManager: { async removeCards() {}, showNewCard() {} },
       cardsReadyForTurnStartSkill: new WeakSet<CardView>(),
       onMatchEnded() {},
     });
@@ -451,7 +460,7 @@ export class Game {
 
   private sampleEnemyReserve(enemy: Player, random: () => number): void {
     const count = enemy.deck.cards.length;
-    const known = enemy.team.filter(card => enemy.hand.includes(card) || card.health <= 0);
+    const known = enemy.team.filter(card => enemy.hand.includes(card) || !card.isAlive);
     const knownNames = new Set(known.map(card => card.name));
     const available = reserveCandidates.filter(card => !knownNames.has(card.name));
     const reserve: Card[] = [];
@@ -491,20 +500,18 @@ export class Game {
       if (this.stopped) return;
       if (!result) break;
 
-      const animation = this._animationManager.playAttack(result);
-      if (attacker.card.classType === ClassType.Mage) {
-        this._broadcast.emit(BroadcastEvents.CHECK_ARCANE_BLAST, { attacker, opponentCardViews: opponents });
-      }
-      await animation;
+      await this._combatManager.resolveArcaneBlast(attacker, opponents);
       if (this.stopped) return;
       followUp = result.followUp;
+      if (!followUp) await this._combatManager.resolveThunderMark(attacker, opponents);
+      if (this.stopped) return;
     } while (followUp);
     await this.onTurnCompleted();
   }
 
   // Effect damage
   private async applyEffectDamage(card: Card): Promise<void> {
-    if (!card.activeEffects) return;
+    if (card.isOnLastHunt) return;
 
     for (const effect of card.activeEffects) {
       const previousHealth = card.health;
@@ -520,7 +527,7 @@ export class Game {
 
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
             targetView: cardView,
-            message: `Kanama · ${previousHealth - card.health} hasar`,
+            message: `Bleed · ${previousHealth - card.health} damage`,
             color: "#ff0000"
           });
           break;
@@ -535,7 +542,7 @@ export class Game {
 
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
             targetView: burnCardView,
-            message: `Yanma · ${previousHealth - card.health} hasar`,
+            message: `Burn · ${previousHealth - card.health} damage`,
             color: "#ff4500"
           });
           break;
@@ -550,7 +557,7 @@ export class Game {
 
           this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
             targetView: poisonCardView,
-            message: `Zehir · ${previousHealth - card.health} hasar`,
+            message: `Poison · ${previousHealth - card.health} damage`,
             color: "#008000"
           });
           break;
@@ -613,10 +620,10 @@ export class Game {
     const ganeshas = activeCardViews.filter(view => view.card.name === CharacterList.Ganesha.name);
     const otherCards = activeCardViews.filter(view => view.card.name !== CharacterList.Ganesha.name);
     [...ganeshas, ...otherCards].forEach(view => {
-      const needsEnemyTurn = view.card.name === CharacterList.Herbalist.name
-        || view.card.name === CharacterList.Ganesha.name;
-      if (needsEnemyTurn && !this.cardsReadyForTurnStartSkill.has(view)) return;
-      if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn && view.card.health > 0) {
+      const needsReadyView = view.card.name === CharacterList.Herbalist.name
+        || view.card.name === CharacterList.Ganesha.name || view.card.name === CharacterList.Knight.name;
+      if (needsReadyView && !this.cardsReadyForTurnStartSkill.has(view)) return;
+      if (view.card.skill?.triggerTiming === SkillTiming.StartOfTurn && view.card.isAlive) {
         const context: CombatContext = {
           random: this._combatManager.random,
           attacker: view.card,
@@ -643,7 +650,7 @@ export class Game {
   }
 
   private triggerDeathSkills(): void {
-    const allDeadCards = [...this._playerCardViews, ...this._botCardViews].filter(view => view.card.health <= 0);
+    const allDeadCards = [...this._playerCardViews, ...this._botCardViews].filter(view => !view.card.isAlive);
 
     allDeadCards.forEach(deadCardView => {
       if (this._combatManager.tryPhoenixRebirth(deadCardView)) return;
@@ -686,20 +693,21 @@ export class Game {
     const inactiveViews = this._turn === Turn.Player ? this._botCardViews : this._playerCardViews;
     const activeTeam = (this._turn === Turn.Player ? this._player : this._bot).team;
     for (const view of inactiveViews) {
-      view.card.tickMark(activeTeam);
-      view.card.tickInvisibility();
+      view.card.tickSourceTurnEffects(activeTeam);
+      view.card.tickOpponentTurnEffects();
       view.updateCover();
     }
 
     for (const cardView of cardViews) {
       if (cardView.card.activeEffects) {
         await this.applyEffectDamage(cardView.card);
-        if (cardView.card.health > 0) {
+        if (cardView.card.isAlive) {
           const wasEgg = cardView.card.isPhoenixEgg;
           await cardView.card.updateEffects();
+          cardView.card.tickLastHunt();
           if (wasEgg && !cardView.card.isPhoenixEgg && !cardView.card.isZombified) {
             this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
-              targetView: cardView, abilityName: cardView.card.skill?.name, message: "Phoenix yeniden doğdu!", color: "#ff6600"
+              targetView: cardView, abilityName: cardView.card.skill?.name, message: "Phoenix was reborn!", color: "#ff6600"
             });
           }
         }
@@ -721,8 +729,8 @@ export class Game {
     this._attacker = null;
 
     this._combatManager.handleWarriorAbility(this._playerCardViews, this._botCardViews);
-    const playerDead = this._playerCardViews.filter(view => view.card.health <= 0);
-    const botDead = this._botCardViews.filter(view => view.card.health <= 0);
+    const playerDead = this._playerCardViews.filter(view => !view.card.isAlive);
+    const botDead = this._botCardViews.filter(view => !view.card.isAlive);
     const fallen = [...playerDead, ...botDead];
     for (const view of fallen) {
       view.card.clearEffects();
@@ -732,7 +740,7 @@ export class Game {
     if (this.stopped) return;
     const waitingViews = this._turn === Turn.Player ? this._botCardViews : this._playerCardViews;
     for (const view of waitingViews) {
-      if (view.card.health > 0) {
+      if (view.card.isAlive) {
         this.cardsReadyForTurnStartSkill.add(view);
       }
     }

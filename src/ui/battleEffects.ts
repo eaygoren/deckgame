@@ -2,28 +2,56 @@ import { EffectType, SkillEffect } from "../shared/interfaces/skillInterfaces";
 
 interface EffectBadge {
   label: string;
-  path: string;
+  path: string | readonly { d: string; transform?: string }[];
 }
 
 export const clockIconPath = "M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z";
+export const thunderMarkIconPath = "M13 2.9l-7 10.2h5.2l-.7 8L18 10.8h-5.4l.4-7.9ZM4 5.8l1.8 1.8m12.4 8.8 1.8 1.8";
+export const lastHuntIconPath = "M18.9 16.3a8.7 8.7 0 1 1-6.4-13.2 7.4 7.4 0 0 0 6.4 13.2Z M11.6 14.3l2-4.5m1 5.5 2-4.5m1 5.5 2-4.5";
 
 export const effectBadges: Partial<Record<EffectType, EffectBadge>> = {
-  [EffectType.VoidLock]: { label: "Void engeli", path: "M12 3 21 12 12 21 3 12Z M8 8l8 8" },
-  [EffectType.PhoenixEgg]: { label: "Phoenix yumurtası", path: "M12 3c-3.3 0-7 6.2-7 11a7 7 0 0 0 14 0c0-4.8-3.7-11-7-11Z" },
-  [EffectType.SkillCopy]: { label: "Yetenek kopyası", path: "M8 8h12v12H8ZM16 4H4v12" },
-  [EffectType.Freeze]: { label: "Donma", path: "M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3m-6 16 3-3 3 3" },
-  [EffectType.Protection]: { label: "Koruma", path: "M12 3 20 6v5c0 4.5-2.8 7.8-8 10-5.2-2.2-8-5.5-8-10V6l8-3Z M8 12l3 3 5-5" },
-  [EffectType.Bleed]: { label: "Kanama", path: "M12 3c-2.4 3.4-6 7.2-6 11a6 6 0 0 0 12 0c0-3.8-3.6-7.6-6-11Z M9 15a3 3 0 0 0 3 3" },
-  [EffectType.Burn]: { label: "Yanma", path: "M12 22c-4.1 0-7-2.7-7-6.7 0-2.5 1.3-4.8 3.3-6.3-.2 2.1.7 3.2 1.4 3.5C12.2 9.5 13.1 6 12.2 2c4.6 3.5 6.8 8.8 6.8 13.3 0 4-2.9 6.7-7 6.7Z" },
-  [EffectType.Poison]: { label: "Zehir", path: "M9 3h6m-5 0v6l-4 4a3 3 0 0 0-1 2v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4a3 3 0 0 0-1-2l-4-4V3M9 15l6 3m0-3-6 3" },
-  [EffectType.Silence]: { label: "Susturma", path: "M9 4h9a3 3 0 0 1 3 3v8a3 3 0 0 1-2 2.8M4.6 5A3 3 0 0 0 3 7v8a3 3 0 0 0 3 3h1v3l4-3h3M3 3l18 18" },
-  [EffectType.AttackReduction]: { label: "Saldırı düşüşü", path: "m4 19 4-4m-3-2 6 6m-3-4L18 5h3v3L11 18m9-4v7m-3-3 3 3 3-3" },
-  [EffectType.Mark]: { label: "İşaret", path: "M12 2v4m0 12v4M2 12h4m12 0h4M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm0 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" },
-  [EffectType.Taunt]: { label: "Kışkırtma", path: "M12 2v14m0 4v2" },
-  [EffectType.ZombifyPending]: { label: "Enfeksiyon", path: "M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0ZM12 6V3m0 18v-3M6 12H3m18 0h-3M7.8 7.8 5.5 5.5m13 13-2.3-2.3m0-8.4 2.3-2.3m-13 13 2.3-2.3M10 10h.1m3.9 1h.1m-2.1 3h.1" },
-  [EffectType.Zombify]: { label: "Zombileşme", path: "M12 3a8 8 0 0 0-5 14.2V21h10v-3.8A8 8 0 0 0 12 3ZM8 11l2 2m0-2-2 2m6-2 2 2m0-2-2 2m-2 5v3" },
-  [EffectType.WarriorRage]: { label: "Öfke", path: "M5 12V8a2 2 0 0 1 4 0V5a2 2 0 0 1 4 0v2a2 2 0 0 1 4 0v2a2 2 0 0 1 4 0v4l-3 5v3H8v-3l-4-4a2 2 0 0 1 2.8-2.8L9 13m5-4-2 3 3 1-2 3" },
-  [EffectType.Invisible]: { label: "Görünmezlik", path: "M3 3l18 18M10.6 5.1C16 4 20.3 8.2 22 12a16 16 0 0 1-2.7 3.8M6.2 7.2A15 15 0 0 0 2 12c2.3 4.2 6 7 10 7a10 10 0 0 0 4.8-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2" },
+  [EffectType.VoidLock]: { label: "Void Lock", path: "M7.5 10V7a4.5 4.5 0 0 1 9 0v3M6.3 10h11.4a1.8 1.8 0 0 1 1.8 1.8v6.4a1.8 1.8 0 0 1-1.8 1.8H6.3a1.8 1.8 0 0 1-1.8-1.8v-6.4A1.8 1.8 0 0 1 6.3 10Z M10.2 13.2l3.6 3.6m0-3.6-3.6 3.6" },
+  [EffectType.PhoenixEgg]: { label: "Phoenix Egg", path: "M12 2.7c-3.5 0-7.1 6.6-7.1 11.6a7.1 7.1 0 0 0 14.2 0C19.1 9.3 15.5 2.7 12 2.7Z M5.2 11.8l4.1 1.5 2.3-3.7 2.7 5 4.3-2.6" },
+  [EffectType.SkillCopy]: { label: "Copied Ability", path: "M14.5 4H5.8a1.7 1.7 0 0 0-1.7 1.7v9.1M9.5 8h8.8a1.7 1.7 0 0 1 1.7 1.7v8.6a1.7 1.7 0 0 1-1.7 1.7H9.5a1.7 1.7 0 0 1-1.7-1.7V9.7A1.7 1.7 0 0 1 9.5 8Z M14 10.8v6.4m-3.2-3.2h6.4" },
+  [EffectType.Freeze]: {
+    label: "Freeze",
+    path: [
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4" },
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4", transform: "rotate(60 12 12)" },
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4", transform: "rotate(120 12 12)" },
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4", transform: "rotate(180 12 12)" },
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4", transform: "rotate(240 12 12)" },
+      { d: "M12 12V2.8m-2.4 2.6L12 7.8l2.4-2.4", transform: "rotate(300 12 12)" },
+    ],
+  },
+  [EffectType.Protection]: { label: "Protection", path: "M12 3c2.6 1.5 5.3 2.3 8 2.6v5c0 4.5-2.7 7.8-8 10.4-5.3-2.6-8-5.9-8-10.4v-5c2.7-.3 5.4-1.1 8-2.6Z M8.6 12.1l2.3 2.4 4.5-5" },
+  [EffectType.DebuffImmunity]: { label: "Debuff Immunity", path: "M12 3c2.6 1.5 5.3 2.3 8 2.6v5c0 4.5-2.7 7.8-8 10.4-5.3-2.6-8-5.9-8-10.4v-5c2.7-.3 5.4-1.1 8-2.6ZM12 8v7m-3.5-3.5h7" },
+  [EffectType.Bleed]: { label: "Bleed", path: "M12 2.7c-2.9 4.2-6.3 7.6-6.3 12a6.3 6.3 0 0 0 12.6 0c0-4.4-3.4-7.8-6.3-12Z M8.8 14.8a3.2 3.2 0 0 0 3.2 3.2" },
+  [EffectType.Burn]: { label: "Burn", path: "M12 21a7.1 7.1 0 0 1-6.1-10.7c.4 1.7 1.3 2.4 2.3 2.8C8.6 8.5 12.1 7 12.2 3c3.4 2.1 5.6 6.2 4.6 10.2.7-.3 1.4-.9 1.8-1.8A7.1 7.1 0 0 1 12 21Z M12 21c-2.9-.8-3.4-3.9 0-6.8 3.4 2.9 2.9 6 0 6.8Z" },
+  [EffectType.Poison]: { label: "Poison", path: "M9 3h6m-5 0v5.5l-4 5.1a4.5 4.5 0 0 0 3.6 7.3h4.8a4.5 4.5 0 0 0 3.6-7.3l-4-5.1V3M6.4 14.3c3.3-2.1 5.2 2.6 8.6.5 1-.6 1.7-.7 2.6-.5m-6 3.4h.1" },
+  [EffectType.Silence]: { label: "Silence", path: "M4.2 5.1h15.6a1.8 1.8 0 0 1 1.8 1.8v8a1.8 1.8 0 0 1-1.8 1.8h-8.9L6.8 20v-3.3H4.2a1.8 1.8 0 0 1-1.8-1.8v-8a1.8 1.8 0 0 1 1.8-1.8Z M3.2 3.2 20.8 20.8" },
+  [EffectType.AttackReduction]: {
+    label: "Attack Down",
+    path: [
+      { d: "M9.9 8.5V6L12 2.6 14.1 6v2.1L12 7.5l-.8 2.4Zm0 3.1v4.5h4.2v-4.7L12 13l-.9-2.4Zm-2 4.5h8.2M12 16.1v4.5", transform: "rotate(40 12 12)" },
+    ],
+  },
+  [EffectType.Mark]: { label: "Mark", path: "M19.1 12 a7.1 7.1 0 1 0 -14.2 0 a7.1 7.1 0 1 0 14.2 0Z M14.2 12 a2.2 2.2 0 1 0 -4.4 0 a2.2 2.2 0 1 0 4.4 0Z M12 2.6v4m0 10.8v4m-9.4-9.4h4m10.8 0h4" },
+  [EffectType.ThunderMark]: { label: "Thunder Mark", path: thunderMarkIconPath },
+  [EffectType.LastHunt]: { label: "Last Hunt", path: lastHuntIconPath },
+  [EffectType.Taunt]: { label: "Taunt", path: "M4.2 5.1h15.6a1.8 1.8 0 0 1 1.8 1.8v8a1.8 1.8 0 0 1-1.8 1.8h-8.9L6.8 20v-3.3H4.2a1.8 1.8 0 0 1-1.8-1.8v-8a1.8 1.8 0 0 1 1.8-1.8Z M12 8.2v3.8m0 2.2h.01" },
+  [EffectType.ZombifyPending]: {
+    label: "Infection",
+    path: [
+      { d: "M10.6 8.8a4.3 4.3 0 0 1-1.2-5.5 5.4 5.4 0 0 0 2.6 10 5.4 5.4 0 0 0 2.6-10 4.3 4.3 0 0 1-1.2 5.5", transform: "translate(2.2 2.2) scale(.82)" },
+      { d: "M10.6 8.8a4.3 4.3 0 0 1-1.2-5.5 5.4 5.4 0 0 0 2.6 10 5.4 5.4 0 0 0 2.6-10 4.3 4.3 0 0 1-1.2 5.5", transform: "translate(2.2 2.2) scale(.82) rotate(120 12 12)" },
+      { d: "M10.6 8.8a4.3 4.3 0 0 1-1.2-5.5 5.4 5.4 0 0 0 2.6 10 5.4 5.4 0 0 0 2.6-10 4.3 4.3 0 0 1-1.2 5.5", transform: "translate(2.2 2.2) scale(.82) rotate(240 12 12)" },
+      { d: "M14 12 a2 2 0 1 0 -4 0 a2 2 0 1 0 4 0Z", transform: "translate(2.2 2.2) scale(.82)" },
+    ],
+  },
+  [EffectType.Zombify]: { label: "Zombified", path: "M12 3.1a7.5 7.5 0 0 0-4.7 13.3v3.9h9.4v-3.9A7.5 7.5 0 0 0 12 3.1ZM7.5 10.4l2.4 2.4m0-2.4-2.4 2.4m6.6-2.4 2.4 2.4m0-2.4-2.4 2.4m-2.1.9v1m-1.7 3v2.6m3.4-2.6v2.6" },
+  [EffectType.WarriorRage]: { label: "Rage", path: "M4.6 11V7.6a1.9 1.9 0 0 1 3.8 0V6a1.8 1.8 0 0 1 3.6 0v.6a1.8 1.8 0 0 1 3.6 0v1a1.8 1.8 0 0 1 3.6 0v5.6c0 1.6-.7 2.8-2.1 4v3.3H8v-3.3l-3.3-3a2.1 2.1 0 0 1 0-3.2c.8-.7 1.9-.6 2.6 0l1.8 1.4m-.7-4.8v2m3.6-3v3m3.6-2v2m-7.6 7.6h9.1" },
+  [EffectType.Invisible]: { label: "Stealth", path: "M3.2 3.2 20.8 20.8M10 6.1c4.2-.8 8.4 1.3 11.3 5.9-.9 1.5-2 2.7-3.2 3.6M6.4 7.8A15.9 15.9 0 0 0 2.7 12c3.1 4.8 7.8 7 12.2 5.6m-5-7.7a3 3 0 0 0 4.2 4.2" },
 };
 
 export function createEffectBadge(badge?: EffectBadge): HTMLSpanElement {
@@ -33,55 +61,68 @@ export function createEffectBadge(badge?: EffectBadge): HTMLSpanElement {
   const icon = document.createElementNS(namespace, "svg");
   icon.setAttribute("viewBox", "0 0 24 24");
   icon.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(namespace, "path");
-  path.setAttribute("d", badge?.path ?? "M12 8v4m0 4h.01");
-  icon.append(path);
+  const shape = badge?.path ?? "M12 8v4m0 4h.01";
+  const parts = typeof shape === "string" ? [{ d: shape }] : shape;
+  for (const { d, transform } of parts) {
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("d", d);
+    if (transform) path.setAttribute("transform", transform);
+    icon.append(path);
+  }
   element.append(icon);
   return element;
 }
 
 export function effectDuration(effect: SkillEffect): string {
-  if (effect.type === EffectType.Protection) return "Kendi sonraki turu başlayana kadar";
-  if (effect.type === EffectType.Invisible) return "Rakibin sonraki turu bitene kadar";
-  if (effect.type === EffectType.Mark) return "İşaretleyen tarafın sonraki turunun sonuna kadar";
-  if (effect.duration === Infinity) return "Süresiz";
-  return effect.duration + " tur kaldı";
+  if (effect.type === EffectType.Protection) return "Until the start of this team's next turn";
+  if (effect.type === EffectType.Invisible || effect.type === EffectType.DebuffImmunity) return "Until the end of the opposing team's next turn";
+  if (effect.type === EffectType.Mark || effect.type === EffectType.ThunderMark) return "Until the end of the marking team's next turn";
+  if (effect.type === EffectType.Freeze) return "Until the end of the freezing team's next turn";
+  if (effect.duration === Infinity) return "Indefinite";
+  return `${effect.duration} ${effect.duration === 1 ? "turn" : "turns"} left`;
 }
 
-export function effectDetails(effect: SkillEffect): string {
+export function effectDetails(effect: Pick<SkillEffect, "type" | "value" | "protector" | "source" | "copiedSkill">): string {
   switch (effect.type) {
     case EffectType.VoidLock:
-      return "Kart can yenileyemez ve saldırı veya can güçlendirmesi alamaz.";
+      return "This card cannot heal or gain attack or HP buffs.";
+    case EffectType.DebuffImmunity:
+      return "This card cannot receive new debuffs.";
     case EffectType.PhoenixEgg:
-      return "Yumurta saldırı ve karşı saldırı yapamaz. Süre sonunda hayattaysa Phoenix yeniden doğar.";
+      return "The egg cannot attack or counterattack. If it survives until the effect expires, Phoenix is reborn.";
     case EffectType.Bleed:
     case EffectType.Burn:
     case EffectType.Poison:
-      return `Kartın turu sonunda ${effect.value || 1} hasar.`;
+      return `Takes ${effect.value || 1} damage at the end of its turn.`;
     case EffectType.Freeze:
-      return "Kart saldıran olarak seçilemez ve karşı saldırı yapamaz.";
+      return "This card cannot attack or counterattack.";
     case EffectType.Protection:
-      return effect.protector && effect.protector.health > 0
-        ? effect.protector.name + " savaş hasarının yarısını üstlenir."
-        : "Koruyucu düştüğü için hasar paylaşımı sona erdi.";
+      if (effect.protector && effect.protector.health <= 0) {
+        return "Damage sharing has ended because the protector fell.";
+      }
+      return `${effect.protector?.name ?? "The protector"} absorbs up to half the incoming combat damage, capped by their remaining HP. This card takes the rest.`;
     case EffectType.Mark:
-      return "Normal saldırılardan %50 daha fazla hasar alır.";
+      return "The marked target takes 50% more damage from normal attacks.";
+    case EffectType.ThunderMark:
+      return "Zeus’s lightning deals 1 damage to an unmarked target and 2 to a target he has already marked.";
+    case EffectType.LastHunt:
+      return "This card stays in play at 0 HP. It can attack and be targeted, but cannot take damage, heal, or counterattack.";
     case EffectType.Taunt:
-      return effect.source ? "Kart yalnızca " + effect.source.name + " hedefine saldırabilir." : "";
+      return `This card can only attack ${effect.source?.name ?? "the unit that taunted it"}.`;
     case EffectType.ZombifyPending:
-      return "Kart geri sayım boyunca yeteneklerini kullanabilir. Süre bitince kalıcı olarak Zombie olur.";
+      return "This card can use its abilities during the countdown. It permanently becomes a Zombie when the effect expires.";
     case EffectType.Zombify:
-      return "Yeteneksiz Zombie. Karakter ve sınıf yeteneği kullanamaz.";
+      return "This card takes Zombie’s class and attack type, with half of Zombie’s base attack and HP. It cannot use character or class abilities.";
     case EffectType.Silence:
-      return "Kart özel yeteneğini kullanamaz.";
+      return "This card cannot use its special ability.";
     case EffectType.SkillCopy:
-      return `${effect.copiedSkill?.name ?? "Kopyalanan yetenek"} koşulu sağlanırsa sonraki normal saldırıda çalışır.`;
+      return `${effect.copiedSkill?.name ?? "The copied ability"} triggers on the next normal attack if its conditions are met.`;
     case EffectType.AttackReduction:
-      return `Saldırı gücü %${Math.floor((effect.value || 0.5) * 100)} azaldı.`;
+      return `Attack is reduced by ${Math.floor((effect.value || 0.5) * 100)}%.`;
     case EffectType.WarriorRage:
-      return effect.value === undefined ? "Saldırı gücü artar." : `Saldırı gücü +${effect.value}.`;
+      return effect.value === undefined ? "Attack is increased." : `Attack +${effect.value}.`;
     case EffectType.Invisible:
-      return "Kart saldırıyla hedef alınamaz ve karşı hasar almaz.";
+      return "This card cannot be targeted by attacks and takes no counterattack damage.";
     default:
       return "";
   }

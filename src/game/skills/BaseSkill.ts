@@ -34,7 +34,7 @@ export abstract class BaseSkill implements ISkill {
     }
 
     protected findRandomAlly(caster: Card, allAllies?: Card[], random = Math.random): Card | null {
-        const allies = allAllies?.filter(card => card !== caster && card.health > 0) || [];
+        const allies = allAllies?.filter(card => card !== caster && card.isAlive) || [];
 
         if (allies.length === 0) return null;
 
@@ -44,7 +44,7 @@ export abstract class BaseSkill implements ISkill {
     protected findRandomDeadAlly(player?: Player, random = Math.random): Card | null {
         if (!player) return null;
         const deadAllies = player.team.filter(card =>
-            card.health <= 0 && card !== player.leader &&
+            !card.isAlive && card !== player.leader &&
             !player.hand.includes(card) && !player.deck.cards.includes(card)
         );
 
@@ -56,7 +56,7 @@ export abstract class BaseSkill implements ISkill {
     }
 
     protected findRandomEnemy(allEnemies?: Card[], random = Math.random): Card | null {
-        const enemies = allEnemies?.filter(card => card.health > 0) || [];
+        const enemies = allEnemies?.filter(card => card.isAlive) || [];
 
         if (enemies.length === 0) return null;
 
