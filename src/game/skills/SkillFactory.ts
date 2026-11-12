@@ -16,7 +16,7 @@ export class SkillFactory {
 
         [Characters.Alien, {
             name: "Stealth Mode",
-            description: "Advanced alien technology bends light around its form. After surviving damage, gains [[invisible]] through the end of the next enemy turn. Enemies can still target Alien if his only remaining ally is the leader or if none of his other non-leader allies can be targeted.",
+            description: "Advanced alien technology bends light around its form. After surviving damage, gains [[invisible]] through the enemy turn and until the end of the friendly turn that follows. Enemies can still target Alien if his only remaining ally is the leader or if none of his other non-leader allies can be targeted.",
             triggerTiming: SkillTiming.OnDamageReceived,
             effects: [
                 { type: EffectType.Invisible, target: TargetType.Self, duration: 1 }
@@ -33,6 +33,13 @@ export class SkillFactory {
             ]
         }],
 
+        [Characters.Archmage, {
+            name: "Timeweave",
+            description: "With a twist of his fingers, old wounds linger and distant curses draw near. After each normal attack that hits a surviving target, extends all of its timed [[bleed]], [[burn]], [[poison]], [[mark]], and [[thunder_mark]] effects by one turn. Shortens [[zombify_pending]] by one turn and triggers the transformation immediately if it reaches zero.",
+            triggerTiming: SkillTiming.AfterAttack,
+            effects: [{ type: EffectType.Timeweave, target: TargetType.Enemy }]
+        }],
+
         [Characters.Assassin, {
             name: "Enhanced Critical",
             description: "Years of training have honed deadly precision to perfection. Doubles critical chance, 25% counter-crit chance.",
@@ -40,6 +47,21 @@ export class SkillFactory {
             effects: [
                 { type: EffectType.CritBoost, target: TargetType.Self, value: 2, chance: 0.25 }
             ]
+        }],
+
+        [Characters.Banshee, {
+            name: "Dread Wail",
+            description: "In her wail, the living hear the echo of their own funeral bells. When Banshee's normal attack or Arcane Blast damages a surviving enemy, applies [[fear]] until the end of that enemy's next turn.",
+            triggerTiming: SkillTiming.AfterAttack,
+            triggersOnArcaneBlast: true,
+            effects: [{ type: EffectType.Fear, target: TargetType.Enemy }]
+        }],
+
+        [Characters.Cerberus, {
+            name: "Threefold Bite",
+            description: "Three jaws stand watch at the gates of the dead. This card has one active head at 1–2 HP, two at 3–4 HP, and three at 5 HP or more. If it survives its normal attack, each extra head bites a different random enemy unit other than the primary target or leader for 1 damage, without provoking a counterattack. When counterattacking, each extra head adds 1 damage against the attacker, based on HP after the incoming hit.",
+            triggerTiming: SkillTiming.Passive,
+            effects: [{ type: EffectType.ThreeHeads, target: TargetType.Self }]
         }],
 
         [Characters.Dragon, {
@@ -252,7 +274,7 @@ export class SkillFactory {
 
         [Characters.Werewolf, {
             name: "Last Hunt",
-            description: "Even death must wait until the hunt is over. Once per match, a lethal counterattack during this card’s normal attack triggers [[last_hunt]] at 0 HP. This card dies at the end of your next turn.",
+            description: "Even death must wait until the hunt is over. Once per match, a lethal counterattack during this card’s normal attack triggers [[last_hunt]] at 0 HP. While hunting, this card is immune to new debuffs and dies at the end of your next turn.",
             triggerTiming: SkillTiming.AfterAttack,
             once: true,
             persistsAfterDeath: true,

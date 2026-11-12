@@ -1,6 +1,19 @@
-import { lastHuntIconPath, thunderMarkIconPath } from "./battleEffects";
+import { appendIconPaths, createEffectBadge, fearIcon, lastHuntIconPath, threeHeadsIconPath, thunderMarkIconPath, timeweaveIcon } from "./battleEffects";
+import type { IconShape } from "./battleEffects";
 
-const abilityIcons: Partial<Record<string, { color: string; path: string }>> = {
+const abilityIcons: Partial<Record<string, { color: string; path: IconShape }>> = {
+  "Threefold Bite": {
+    color: "#ffb48e",
+    path: threeHeadsIconPath,
+  },
+  "Dread Wail": {
+    color: "#b6f1e3",
+    path: fearIcon,
+  },
+  "Timeweave": {
+    color: "#e5bcff",
+    path: timeweaveIcon,
+  },
   "Last Hunt": {
     color: "#dfbfff",
     path: lastHuntIconPath,
@@ -127,6 +140,13 @@ const abilityIcons: Partial<Record<string, { color: string; path: string }>> = {
   },
 };
 
+export function createAbilityBadge(name: string): HTMLSpanElement {
+  const icon = abilityIcons[name];
+  const badge = createEffectBadge(icon ? { label: name, path: icon.path } : undefined);
+  if (icon) badge.style.setProperty("--ability-color", icon.color);
+  return badge;
+}
+
 export function renderAbilityTitle(heading: Element, name = "Special ability"): void {
   heading.textContent = name;
   const icon = abilityIcons[name];
@@ -139,13 +159,12 @@ export function renderAbilityTitle(heading: Element, name = "Special ability"): 
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("focusable", "false");
   svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", icon.color);
+  svg.setAttribute("stroke", "currentColor");
   svg.setAttribute("stroke-width", "1.55");
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
 
-  const path = document.createElementNS(namespace, "path");
-  path.setAttribute("d", icon.path);
-  svg.append(path);
+  svg.setAttribute("color", icon.color);
+  appendIconPaths(svg, icon.path);
   heading.append(svg);
 }

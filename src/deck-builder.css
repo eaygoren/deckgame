@@ -427,6 +427,7 @@ dialog > p:last-child { color: #d1c5c5; line-height: 1.55; }
   vertical-align: -0.24em;
 }
 :is(#detail-skill, #battle-detail-skill) .ability-title-icon {
+  color: inherit;
   width: 1.5625em;
   height: 1.5625em;
   vertical-align: -0.4em;

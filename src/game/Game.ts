@@ -283,12 +283,15 @@ export class Game {
     if (!this.canTarget(target.card, this._bot)) return;
 
     const attacker = this._attacker.card;
-    const { normal, critical, counter, counterCritical, critChance, counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter } = this._combatManager.previewCombat(attacker, target.card);
+    const { normal, critical, counter, counterAfterCritical, counterCritical, critChance,
+      counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter } = this._combatManager.previewCombat(attacker, target.card);
     const parts = [target.card.name + " · Damage " + normal];
     if (critical !== null) parts.push(`Critical ${critical} (${critChance * 100}%)`);
     if (dodgeChance > 0) parts.push(`Target dodge chance ${dodgeChance * 100}%`);
     if (dodgeCounter !== null) parts.push(`Ranged counter damage on dodge ${dodgeCounter}`);
-    parts.push("Counter damage " + counter);
+    parts.push(counterAfterCritical !== null && counterAfterCritical !== counter
+      ? `Counter damage ${counter} (normal hit) / ${counterAfterCritical} (critical hit)`
+      : "Counter damage " + counter);
     if (counterCritical !== null) parts.push(`Critical counter ${counterCritical} (${counterCritChance * 100}%)`);
     if (counterDodgeChance > 0) parts.push(`Counter dodge chance ${counterDodgeChance * 100}%`);
     if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("An ability may change these values");
@@ -496,7 +499,7 @@ export class Game {
     this.updateBattleHud();
     let followUp: boolean;
     do {
-      const result = await this._combatManager.resolveCombat(attacker, defender);
+      const result = await this._combatManager.resolveCombat(attacker, defender, opponents);
       if (this.stopped) return;
       if (!result) break;
 
@@ -674,6 +677,7 @@ export class Game {
     const allCardViews = [...this._playerCardViews, ...this._botCardViews];
 
     for (const cardView of allCardViews) {
+      cardView.card.removeFearFromFallenSources();
       cardView.updateStats();
     }
   }

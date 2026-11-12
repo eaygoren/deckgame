@@ -6,7 +6,9 @@ export interface ISkill {
     name: string;
     description: string;
     triggerTiming: SkillTiming;
+    readonly exhausted?: boolean;
     persistsAfterDeath?: boolean;
+    triggersOnArcaneBlast?: boolean;
     target?: Card;
     passiveEffect?(type: EffectType): EffectConfig | undefined;
     canUse(caster: Card, target?: Card, context?: CombatContext): boolean;
@@ -30,6 +32,7 @@ export interface CombatContext {
     defender?: Card | null; // Eğer defender null ise, bu skill sadece attacker üzerinde çalışır
     damage?: number;
     dodged?: boolean;
+    isArcaneBlast?: boolean;
     isCounterAttack?: boolean;
     killedByCounterattack?: boolean;
     allPlayerCards?: Card[];
@@ -69,6 +72,7 @@ export enum EffectType {
     Poison = "poison",
     Mark = "mark",
     ThunderMark = "thunder_mark",
+    Timeweave = "timeweave",
     LastHunt = "last_hunt",
     Dodge = "dodge",
     Heal = "heal",
@@ -83,10 +87,12 @@ export enum EffectType {
     IgnoreDefense = "ignore_defense",
     RangedTargetImmunity = "ranged_target_immunity",
     Taunt = "taunt",
+    Fear = "fear",
     StatSwap = "stat_swap",
     AttackCopy = "attack_copy",
     SkillCopy = "skill_copy",
     CriticalFollowUp = "critical_follow_up",
+    ThreeHeads = "three_heads",
     Protection = "protection",
     WarriorRage = "warrior_rage",
     PhoenixRebirth = "phoenix_rebirth",
@@ -114,6 +120,7 @@ export interface SkillConfig {
     effects: EffectConfig[];
     once?: boolean;
     persistsAfterDeath?: boolean;
+    triggersOnArcaneBlast?: boolean;
     chance?: number;
 }
 

@@ -8,6 +8,7 @@ import { Player } from "../game/Player";
 import { clockIconPath, createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 import { renderAbilityDescription } from "./abilityDescription";
 import { renderAbilityTitle } from "./abilityTitle";
+import { createBattleAbilityStatus, replacementAbilityEffect } from "./battleAbilityBadge";
 
 export class BattleField {
   private readonly playerRow = document.querySelector<HTMLElement>("#player-cards")!;
@@ -76,19 +77,19 @@ export class BattleField {
     const row = side === Turn.Player ? this.playerRow : this.botRow;
     const next = [...row.children].find(child => Number((child as HTMLElement).dataset.slot) > view.slot);
     row.insertBefore(view.element, next ?? null);
-    view.info.addEventListener("click", () => this.showCardDetails(view.card));
+    view.info.addEventListener("click", () => this.showCardDetails(view.card, true));
     view.element.addEventListener("effectschange", () => {
-      if (this.details.open && this.detailCard === view.card) this.renderCardStatus(view.card);
+      if (this.details.open && this.detailCard === view.card) this.renderCardStatus(view.card, true);
     });
   }
 
-  private showCardDetails(card: Card): void {
+  private showCardDetails(card: Card, inArena = false): void {
     this.detailCard = card;
-    this.renderCardStatus(card);
+    this.renderCardStatus(card, inArena);
     this.details.showModal();
   }
 
-  private renderCardStatus(card: Card): void {
+  private renderCardStatus(card: Card, inArena: boolean): void {
     this.details.querySelector("#battle-detail-title")!.textContent = card.name;
     renderCardDetailTraits(this.details.querySelector("#battle-detail-meta")!, card);
     renderAbilityTitle(this.details.querySelector("#battle-detail-skill")!, card.skill?.name);
@@ -98,19 +99,10 @@ export class BattleField {
     const fallen = !card.isAlive;
     this.details.querySelector<HTMLElement>("#battle-detail-status")!.hidden = fallen;
     const effects = fallen ? [] : card.activeEffects;
-    const entries = effects.map(effect => {
+    const replacement = inArena ? replacementAbilityEffect(card) : undefined;
+    const entries: HTMLLIElement[] = [];
+    for (const effect of effects) {
       const badge = effectBadges[effect.type];
-      const entry = document.createElement("li");
-      const icon = createEffectBadge(badge);
-      icon.setAttribute("aria-hidden", "true");
-
-      const text = document.createElement("div");
-      const title = document.createElement("strong");
-      title.textContent = badge?.label ?? effect.type;
-      const details = document.createElement("small");
-      details.textContent = effectDetails(effect);
-      text.append(title, details);
-
       const duration = document.createElement("span");
       duration.className = "battle-effect-duration";
       const clock = createEffectBadge({ label: "Clock", path: clockIconPath });
@@ -120,11 +112,40 @@ export class BattleField {
       remaining.textContent = effect.duration === Infinity ? "∞" : String(effect.duration);
       duration.title = effectDuration(effect);
       duration.append(clock, remaining);
-      entry.append(icon, text, duration);
-      return entry;
-    });
+      const icon = createEffectBadge(badge);
+      const isReplacement = effect.type === replacement;
+      if (isReplacement) icon.dataset.abilityStatus = "active";
+      const details = effectDetails(effect);
+      const entry = this.cardEffectEntry(icon, badge?.label ?? effect.type, isReplacement ? `Active. ${details}` : details, duration);
+      if (isReplacement) entries.unshift(entry);
+      else entries.push(entry);
+    }
+    const ability = inArena ? createBattleAbilityStatus(card) : undefined;
+    if (ability) {
+      const status = document.createElement("span");
+      status.className = "battle-effect-duration";
+      status.textContent = ability.headCount || ability.status;
+      const details = ability.headCount ? `${ability.status}. ${ability.description}` : ability.description;
+      entries.unshift(this.cardEffectEntry(ability.badge, ability.name, details, status));
+    }
     this.details.querySelector("#battle-detail-effects")!.replaceChildren(...entries);
     this.details.querySelector<HTMLElement>("#battle-effects-empty")!.hidden = entries.length > 0;
+  }
+
+  private cardEffectEntry(icon: HTMLSpanElement, label: string, description: string, value: HTMLSpanElement): HTMLLIElement {
+    const entry = document.createElement("li");
+    icon.setAttribute("aria-hidden", "true");
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = label;
+    text.append(title);
+    if (description) {
+      const details = document.createElement("small");
+      details.textContent = description;
+      text.append(details);
+    }
+    entry.append(icon, text, value);
+    return entry;
   }
 
   updateCardPanels(player: Player, bot: Player): void {

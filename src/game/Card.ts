@@ -11,7 +11,7 @@ const copyableSkillTimings = new Set([SkillTiming.BeforeAttack, SkillTiming.Afte
 const negativeEffects = new Set([
   EffectType.Bleed, EffectType.Burn, EffectType.Poison, EffectType.Freeze,
   EffectType.Silence, EffectType.AttackReduction, EffectType.Mark, EffectType.ThunderMark, EffectType.Taunt,
-  EffectType.ZombifyPending, EffectType.VoidLock,
+  EffectType.ZombifyPending, EffectType.VoidLock, EffectType.Fear,
 ]);
 
 export class Card implements ICard {
@@ -98,6 +98,19 @@ export class Card implements ICard {
     return this.skill?.passiveEffect?.(type);
   }
 
+  public get hasThreefoldBite(): boolean {
+    return Boolean(this.skill?.passiveEffect?.(EffectType.ThreeHeads));
+  }
+
+  public get hasUsedPhoenixRebirth(): boolean {
+    return this.phoenixRebirthUsed;
+  }
+
+  public activeHeadCount(health = this.health): number {
+    if (!this.passiveEffect(EffectType.ThreeHeads)) return 0;
+    return Math.min(3, Math.ceil(Math.max(0, health) / 2));
+  }
+
   // Skill kullanma
   public useSkill(target?: Card, context?: CombatContext): SkillResult | null {
     return this.executeSkill(this._skill, target, context);
@@ -131,7 +144,11 @@ export class Card implements ICard {
   }
 
   private executeSkill(skill: ISkill | null | undefined, target?: Card, context?: CombatContext): SkillResult | null {
-    if (!skill || this.isZombified || this.hasEffect(EffectType.Silence) || this._skillUsedThisTurn) {
+    if (!skill || this.isZombified || this.hasEffect(EffectType.Silence)) {
+      return null;
+    }
+    const isArcaneBlast = context?.isArcaneBlast === true;
+    if (isArcaneBlast ? !skill.triggersOnArcaneBlast : this._skillUsedThisTurn) {
       return null;
     }
 
@@ -140,7 +157,7 @@ export class Card implements ICard {
     }
 
     const result = skill.execute(this, target ?? skill.target, context);
-    if (result.success) {
+    if (result.success && !isArcaneBlast) {
       this._skillUsedThisTurn = true;
     }
 
@@ -150,7 +167,12 @@ export class Card implements ICard {
   // Effect yönetimi
   public addEffect(effect: SkillEffect): void {
     if (this.blocksDebuff(effect.type)) return;
-    this.removeEffect(effect.type);
+    if (effect.type === EffectType.Fear) {
+      this._activeEffects = this._activeEffects.filter(active =>
+        active.type !== EffectType.Fear || active.source !== effect.source);
+    } else {
+      this.removeEffect(effect.type);
+    }
     this._activeEffects.push(effect);
 
     switch (effect.type) {
@@ -187,12 +209,22 @@ export class Card implements ICard {
     return this._activeEffects.some(e => e.type === effectType);
   }
 
+  public fears(source: Card): boolean {
+    return source.isAlive && this._activeEffects.some(effect =>
+      effect.type === EffectType.Fear && effect.source === source);
+  }
+
+  public removeFearFromFallenSources(): void {
+    this._activeEffects = this._activeEffects.filter(effect =>
+      effect.type !== EffectType.Fear || effect.source?.isAlive);
+  }
+
   public get hasNegativeEffects(): boolean {
     return this._activeEffects.some(effect => negativeEffects.has(effect.type));
   }
 
   public blocksDebuff(type: EffectType): boolean {
-    return negativeEffects.has(type) && this.hasEffect(EffectType.DebuffImmunity);
+    return negativeEffects.has(type) && (this.isOnLastHunt || this.hasEffect(EffectType.DebuffImmunity));
   }
 
   public cleanseNegativeEffects(): void {
@@ -218,7 +250,7 @@ export class Card implements ICard {
     const wasEgg = this.isPhoenixEgg;
     this._activeEffects = this._activeEffects.filter(effect => {
       // These effects expire at separate turn boundaries.
-      if (effect.type === EffectType.Protection || effect.type === EffectType.Invisible
+      if (effect.type === EffectType.Protection
           || effect.type === EffectType.Mark || effect.type === EffectType.ThunderMark || effect.type === EffectType.Freeze
           || effect.type === EffectType.DebuffImmunity || effect.type === EffectType.LastHunt) {
         return true;
@@ -263,7 +295,16 @@ export class Card implements ICard {
     this.resetTurnSkillUsage();
   }
 
+  public advanceZombification(): boolean {
+    const infection = this._activeEffects.find(effect => effect.type === EffectType.ZombifyPending);
+    if (!infection) return false;
+
+    if (--infection.duration <= 0) this.transformIntoZombie();
+    return true;
+  }
+
   private transformIntoZombie(): void {
+    this.removeEffect(EffectType.ZombifyPending);
     this.removeStatBuffs();
     const zombie = CharacterList.Zombie;
     this._name = zombie.name;
@@ -410,8 +451,7 @@ export class Card implements ICard {
 
   public tickOpponentTurnEffects(): void {
     for (const effect of this.activeEffects) {
-      if ((effect.type === EffectType.Invisible || effect.type === EffectType.DebuffImmunity)
-          && --effect.duration <= 0) {
+      if (effect.type === EffectType.DebuffImmunity && --effect.duration <= 0) {
         this.removeEffect(effect.type);
       }
     }

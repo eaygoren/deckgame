@@ -3,12 +3,12 @@ import { AvailabilityType, CharacterListType } from "../interfaces";
 
 export const Characters = {
     Aerwyn: "Aerwyn", // %25 ihtimalle saldırıdan kaçar ve menzilli karşı saldırı yapar. Elf'in Delici Atış'ı kaçınmayı aşar.
-    Alien: "Alien", // Hasar alıp hayatta kalırsa sonraki rakip turunun sonuna kadar görünmez olur ve karşı hasar almaz. Son normal kartsa veya yanında yalnızca aktif Luxen ve lider varken rakip sadece menzilli saldırabiliyorsa hedef alınabilir.
+    Alien: "Alien", // Hasar alıp hayatta kalırsa rakip turunu izleyen kendi turunun sonuna kadar görünmez olur ve karşı hasar almaz. Son normal kartsa veya yanında yalnızca aktif Luxen ve lider varken rakip sadece menzilli saldırabiliyorsa hedef alınabilir.
     Archangel: "Archangel", // Saldırı sonrası kendisi hariç en düşük mevcut cana sahip müttefiki, kendi mevcut saldırısının yarısı kadar iyileştirir. Karşı saldırıda ölse de çalışır.
-    Archmage: "Archmage",
+    Archmage: "Archmage", // İsabetli normal saldırıları süreli hasar ve işaret etkilerini uzatır, bekleyen zombileşmeyi hızlandırır.
     Assassin: "Assassin", // Normal saldırıda %50, yakın dövüş karşı saldırısında %25 kritik şansına sahiptir.
-    Banshee: "Banshee",
-    Cerberus: "Cerberus",
+    Banshee: "Banshee", // Normal saldırı ve Arcane Blast ile hasar verdiği, hayatta kalan hedefleri korkutur.
+    Cerberus: "Cerberus", // Canına göre 1–3 başla saldırır ve karşılık verir.
     Cyborg: "Cyborg", // saldırmadığı her tur, saldırı gücünü kalıcı olarak 1 artırır //TODO
     Cyclop: "Cyclop",
     Deathknight: "Deathknight", // dost birim öldüğünde desteye 1 adet skeleton ekler //TODO
@@ -96,8 +96,8 @@ export const CharacterList: CharacterListType = {
     Archmage: {
         name: Characters.Archmage,
         cover: Characters.Archmage.toLowerCase(),
-        attack: 5,
-        health: 6,
+        attack: 3,
+        health: 5,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
@@ -132,12 +132,12 @@ export const CharacterList: CharacterListType = {
     Cerberus: {
         name: Characters.Cerberus,
         cover: Characters.Cerberus.toLowerCase(),
-        attack: 6,
-        health: 7,
+        attack: 2,
+        health: 6,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
-        classType: ClassType.Mage,
+        classType: ClassType.Tank,
         unitType: UnitType.Regular,
         availabilityType: AvailabilityType.Playable
     },

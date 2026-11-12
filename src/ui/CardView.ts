@@ -3,6 +3,7 @@ import { EffectType } from "../shared/interfaces/skillInterfaces";
 import { createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 import { cardTraitNames, renderCardHeader, renderCardTraitBadges } from "./cardTraits";
 import { addMouseTilt } from "./cardTilt";
+import { createBattleAbilityStatus, replacementAbilityEffect } from "./battleAbilityBadge";
 
 export class CardView {
   readonly element = document.createElement("article");
@@ -65,20 +66,32 @@ export class CardView {
     this.info.setAttribute("aria-label", this.card.name + " card details");
     this.attack.textContent = "⚔ " + this.card.attack;
     this.health.textContent = "♥ " + this.card.health;
-    this.action.setAttribute("aria-label", [this.card.name, ...cardTraitNames(this.card), "Attack " + this.card.attack, "HP " + this.card.health].join(", "));
     this.updateCover();
   }
 
   updateCover(): void {
     this.element.classList.toggle("is-invisible", this.card.hasEffect(EffectType.Invisible));
+    const label = [this.card.name, ...cardTraitNames(this.card), "Attack " + this.card.attack, "HP " + this.card.health];
+    const ability = createBattleAbilityStatus(this.card);
+    const replacement = replacementAbilityEffect(this.card);
+    let pinned = ability?.badge;
+    if (ability?.heads !== undefined) this.addBadgeCount(ability.badge, ability.heads);
     const badges = this.card.activeEffects.map(effect => {
       const badge = effectBadges[effect.type];
       const icon = createEffectBadge(badge);
       const name = badge?.label ?? effect.type;
-      icon.title = [name, effectDuration(effect), effectDetails(effect)].filter(Boolean).join(" · ");
+      const tooltip = [name, effectDuration(effect), effectDetails(effect)];
+      if (effect.type === replacement) {
+        icon.classList.add("effect-pinned");
+        icon.dataset.abilityStatus = "active";
+        tooltip.splice(1, 0, "Active");
+        this.addBadgeCount(icon, effect.duration);
+        pinned = icon;
+      }
+      icon.title = tooltip.filter(Boolean).join(" · ");
       icon.setAttribute("aria-label", icon.title);
       return icon;
-    });
+    }).filter(badge => badge !== pinned);
     if (badges.length > 1) {
       const label = `${badges.length} active effects`;
       const overflow = createEffectBadge({ label, path: "M6 12h.01M12 12h.01M18 12h.01" });
@@ -87,7 +100,19 @@ export class CardView {
       overflow.setAttribute("aria-label", label);
       badges.push(overflow);
     }
+    if (pinned) {
+      badges.unshift(pinned);
+      label.push(pinned.title);
+    }
+    this.action.setAttribute("aria-label", label.join(", "));
     this.effects.replaceChildren(...badges);
     this.element.dispatchEvent(new Event("effectschange"));
+  }
+
+  private addBadgeCount(badge: HTMLElement, value: number): void {
+    const count = document.createElement("span");
+    count.className = "effect-badge-count";
+    count.textContent = value === Infinity ? "∞" : String(value);
+    badge.append(count);
   }
 }

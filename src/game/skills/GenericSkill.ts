@@ -17,6 +17,7 @@ export class GenericSkill extends BaseSkill {
     public get description(): string { return this.config.description; }
     public get triggerTiming(): SkillTiming { return this.config.triggerTiming; }
     public get persistsAfterDeath(): boolean { return this.config.persistsAfterDeath ?? false; }
+    public get triggersOnArcaneBlast(): boolean { return this.config.triggersOnArcaneBlast ?? false; }
     public get exhausted(): boolean { return this.hasBeenUsed; }
 
     public freshCopy(): GenericSkill {
@@ -84,9 +85,14 @@ export class GenericSkill extends BaseSkill {
 
         switch (effectConfig.type) {
             case EffectType.Invisible:
-                return this.applyStatus(actualTarget, effectConfig, (effectConfig.duration ?? 1) + (context?.isCounterAttack ? 0 : 1));
+                // Damage on the owner's turn includes that turn's end before the enemy gets a turn.
+                return this.applyStatus(actualTarget, effectConfig, (effectConfig.duration ?? 1) + (context?.isCounterAttack ? 1 : 0));
             case EffectType.Taunt:
                 return this.applyStatus(actualTarget, effectConfig, effectConfig.duration ?? 1, caster);
+            case EffectType.Fear:
+                if (!actualTarget.isAlive || !context?.damage || !caster.isAlive) return { success: false };
+                actualTarget.addEffect({ type: EffectType.Fear, target: actualTarget, source: caster, duration: 1 });
+                return { success: true, message: `${actualTarget.name} fears ${caster.name}!` };
             case EffectType.Silence:
                 return this.applySilence(actualTarget, effectConfig);
             case EffectType.Zombify:
@@ -124,6 +130,8 @@ export class GenericSkill extends BaseSkill {
                 return this.applyPoison(actualTarget, effectConfig);
             case EffectType.Mark:
                 return this.applyMark(caster, actualTarget, effectConfig);
+            case EffectType.Timeweave:
+                return this.applyTimeweave(actualTarget);
             case EffectType.LastHunt:
                 if (!context?.killedByCounterattack || caster.isAlive) return { success: false };
                 caster.addEffect({ type: EffectType.LastHunt, target: caster, duration: 2 });
@@ -408,6 +416,28 @@ export class GenericSkill extends BaseSkill {
             message: `${target.name} has been marked!`,
             additionalEffects: [effect]
         };
+    }
+
+    private applyTimeweave(target: Card): SkillResult {
+        if (!target.isAlive) return { success: false };
+
+        const targetName = target.name;
+        const extendableTypes = [EffectType.Bleed, EffectType.Burn, EffectType.Poison, EffectType.Mark, EffectType.ThunderMark];
+        const extended = target.activeEffects.filter(effect =>
+            Number.isFinite(effect.duration) && extendableTypes.includes(effect.type));
+        for (const effect of extended) effect.duration++;
+
+        const accelerated = target.advanceZombification();
+        const changes = [];
+        if (extended.length > 0) {
+            changes.push(`${extended.length} timed effect${extended.length === 1 ? "" : "s"} extended by 1 turn`);
+        }
+        if (accelerated) {
+            changes.push(target.isZombified ? "transformed into a Zombie" : "zombification shortened by 1 turn");
+        }
+        return changes.length > 0
+            ? { success: true, message: `${targetName}: ${changes.join("; ")}.` }
+            : { success: false };
     }
 
     private applyAttackCopy(caster: Card, target?: Card): SkillResult {

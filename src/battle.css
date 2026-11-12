@@ -163,6 +163,28 @@
   border-radius: 50%;
   background: rgb(24 20 27 / 0.6);
 }
+.effect-pinned {
+  position: relative;
+  color: var(--ability-color, #f3d29b);
+}
+.effect-badge-count {
+  position: absolute;
+  inset: auto -1px -1px auto;
+  min-width: 1.2em;
+  padding: .08em;
+  border-radius: 4px;
+  background: #18141b;
+  font-size: max(9px, calc(var(--effect-badge-size) * .36));
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+.effect-badge[data-effect-category="buff"] svg { color: #8cb8ff; }
+.effect-badge[data-effect-category="debuff"] svg { color: #ff7a70; }
+.effect-badge[data-ability-status="ready"] svg { color: #ffc23d; }
+.effect-badge[data-ability-status="active"] svg { color: #28e6ce; }
+.effect-badge[data-ability-status="used"] svg { color: #a3a3a3; }
+.effect-badge[data-ability-status="silenced"] svg { color: #cc79ff; }
 .battle-card-effects .effect-overflow { display: none; }
 #battle-detail-effects .effect-badge {
   --effect-badge-size: 45px;
@@ -305,10 +327,21 @@
   .battle-card[data-slot="1"] { grid-area: 1 / 5 / span 1 / span 2; }
   .battle-card[data-slot="3"] { grid-area: 2 / 2 / span 1 / span 2; }
   .battle-card[data-slot="4"] { grid-area: 2 / 4 / span 1 / span 2; }
+  .battle-card-effects:has(.effect-pinned):has(.effect-overflow:nth-child(n + 5)) > .effect-badge:not(.effect-pinned, .effect-overflow) {
+    display: none;
+  }
+  .battle-card-effects:has(.effect-pinned) > .effect-overflow:nth-child(n + 5) {
+    display: inline-grid;
+  }
 }
 
 @media (orientation: landscape) {
   .battle-arena:not(.is-scaled) .battle-toolbar { width: var(--battle-side-width); }
+}
+
+@media (orientation: portrait) and (max-width: 360px) {
+  .battle-card .card-stats { font-size: .85rem; }
+  .battle-card-effects .effect-badge { --effect-badge-size: 20.25px; }
 }
 
 @media (orientation: landscape) and (max-height: 540px) {
@@ -317,7 +350,7 @@
   .battle-card .card-stats { margin-block-start: -2px; font-size: .85rem; }
   .battle-arena:not(.is-scaled) .battle-card-effects { bottom: -1px; }
   .battle-arena:not(.is-scaled) .battle-card-effects .effect-badge { --effect-badge-size: 20.25px; }
-  .battle-arena:not(.is-scaled) .battle-card-effects:has(.effect-overflow) > .effect-badge:not(.effect-overflow) {
+  .battle-arena:not(.is-scaled) .battle-card-effects:has(.effect-overflow) > .effect-badge:not(.effect-overflow, .effect-pinned) {
     display: none;
   }
   .battle-arena:not(.is-scaled) .battle-card-effects .effect-overflow { display: inline-grid; }
