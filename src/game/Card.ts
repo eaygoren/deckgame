@@ -35,6 +35,8 @@ export class Card implements ICard {
   protected _maxHealth: number; // Başlangıç canını saklamak için
   protected _effectCover?: string;
   private phoenixRebirthUsed = false;
+  private reforgeUsed = false;
+  private awaitingReforge = false;
   private attackBonus = 0;
   private maxHealthBonus = 0;
   public warriorRageUsed = false;
@@ -70,6 +72,34 @@ export class Card implements ICard {
 
   public get isAlive(): boolean {
     return this.health > 0 || this.isOnLastHunt;
+  }
+
+  public get isEmpowered(): boolean {
+    return this.hasEffect(EffectType.Empowered);
+  }
+
+  public queueReforge(): boolean {
+    if (this.isAlive || this.reforgeUsed || !this.passiveEffect(EffectType.Reforge)) return false;
+    this.reforgeUsed = true;
+    this.awaitingReforge = true;
+    return true;
+  }
+
+  public completeReforge(): boolean {
+    if (!this.awaitingReforge) return false;
+    this.awaitingReforge = false;
+    this.clearEffects();
+    this.removeStatBuffs();
+    this._attack = this._initialAttack ?? this._attack;
+    this._maxHealth = this._initialHealth ?? this._maxHealth;
+    this.health = Math.floor(this._maxHealth / 2);
+    this.resetTurnSkillUsage();
+    this.addEffect({ type: EffectType.Empowered, target: this, duration: Infinity });
+    return true;
+  }
+
+  public get isAwaitingReforge(): boolean {
+    return this.awaitingReforge;
   }
 
   public tryEnterPhoenixEgg(): boolean {
@@ -166,7 +196,7 @@ export class Card implements ICard {
 
   // Effect yönetimi
   public addEffect(effect: SkillEffect): void {
-    if (this.blocksDebuff(effect.type)) return;
+    if (this.blocksEffect(effect.type)) return;
     if (effect.type === EffectType.Fear) {
       this._activeEffects = this._activeEffects.filter(active =>
         active.type !== EffectType.Fear || active.source !== effect.source);
@@ -214,17 +244,18 @@ export class Card implements ICard {
       effect.type === EffectType.Fear && effect.source === source);
   }
 
-  public removeFearFromFallenSources(): void {
+  public removeEffectsFromFallenSources(): void {
     this._activeEffects = this._activeEffects.filter(effect =>
-      effect.type !== EffectType.Fear || effect.source?.isAlive);
+      (effect.type !== EffectType.Fear && effect.type !== EffectType.VowLink) || effect.source?.isAlive);
   }
 
   public get hasNegativeEffects(): boolean {
     return this._activeEffects.some(effect => negativeEffects.has(effect.type));
   }
 
-  public blocksDebuff(type: EffectType): boolean {
-    return negativeEffects.has(type) && (this.isOnLastHunt || this.hasEffect(EffectType.DebuffImmunity));
+  public blocksEffect(type: EffectType): boolean {
+    return (this.isEmpowered && type !== EffectType.Empowered)
+      || (negativeEffects.has(type) && (this.isOnLastHunt || this.hasEffect(EffectType.DebuffImmunity)));
   }
 
   public cleanseNegativeEffects(): void {
@@ -250,7 +281,7 @@ export class Card implements ICard {
     const wasEgg = this.isPhoenixEgg;
     this._activeEffects = this._activeEffects.filter(effect => {
       // These effects expire at separate turn boundaries.
-      if (effect.type === EffectType.Protection
+      if (effect.type === EffectType.Protection || effect.type === EffectType.VowLink
           || effect.type === EffectType.Mark || effect.type === EffectType.ThunderMark || effect.type === EffectType.Freeze
           || effect.type === EffectType.DebuffImmunity || effect.type === EffectType.LastHunt) {
         return true;
@@ -412,6 +443,10 @@ export class Card implements ICard {
   public increaseAttack(amount: number): void {
     this._attack += amount;
     this.attackBonus += amount;
+  }
+
+  public get blocksStatBuffs(): boolean {
+    return this.isEmpowered || this.blocksStatRecovery;
   }
 
   public get blocksStatRecovery(): boolean {

@@ -20,7 +20,7 @@ export class CombatManager {
     ) {}
 
     public async resolveCombat(
-        attacker: CardView, defender: CardView, opponents: CardView[] = [defender]
+        attacker: CardView, defender: CardView, opponents: CardView[] = [defender], allies: CardView[] = [attacker]
     ): Promise<{ followUp: boolean } | null> {
         if (!this.canAttackTarget(attacker.card, defender.card, this._opponent.hand)) return null;
 
@@ -58,24 +58,19 @@ export class CombatManager {
             context.damage = previousHealth - defender.card.health;
             return damage;
         });
+        this.clearFallenVows(opponents);
         const attackerWasAlive = attacker.card.isAlive;
         const counterStrikes = this.counterStrikeCount(defender.card);
         const counterDamage = baseCounterDamage + counterStrikes - 1;
         if (dodged && this.canCounterOnDodge(defender.card, attacker.card)) {
-            await this.playDodgeCounter(defender, attacker);
+            await this.playDodgeCounter(defender, attacker, opponents, allies);
         } else if (meleeAttack && !counterBlocked && counterDamage > 0) {
-            const counterDodged = this.dodges(defender.card, attacker.card);
-            // Extra bites are animated separately, but the counter is one hit for defense and on-hit effects.
-            for (let head = 1; head < counterStrikes; head++) {
-                await this.playStrike(defender, attacker, () => 0);
-            }
-            await this.playStrike(defender, attacker, () =>
-                this.applyCombatDamage(defender, attacker, counterDamage, "Counterattack", counterDodged));
-            if (counterDodged) await this.playDodgeCounter(attacker, defender);
+            const dodgedCounterSource = await this.playCounter(defender, attacker, opponents, allies, counterDamage, counterStrikes);
+            if (dodgedCounterSource) await this.playDodgeCounter(attacker, dodgedCounterSource, allies, opponents);
         } else if (counterBlocked) {
             await this.playBlockedCounter(defender);
         } else if (dodged) {
-            await this.playDodgeCounter(defender, attacker);
+            await this.playDodgeCounter(defender, attacker, opponents, allies);
         }
         context.dodged = dodged;
         context.killedByCounterattack = attackerWasAlive && !attacker.card.isAlive;
@@ -143,18 +138,23 @@ export class CombatManager {
         }
 
         if (target.isOnLastHunt) damage = 0;
+        const canTriggerReforge = action === "Attack" || action === "Counterattack" || action === "Ranged counterattack";
         const protector = this.ignoresDefense(source.card) ? undefined : this.livingProtector(target);
         let shared: { name: string; damage: number } | undefined;
         if (protector) {
             const sharedDamage = damage - this.damageAfterProtection(target, damage);
             const previousHealth = protector.health;
             protector.health = Math.max(0, protector.health - sharedDamage);
+            if (canTriggerReforge && !protector.isAlive) protector.queueReforge();
             damage -= sharedDamage;
             shared = { name: protector.name, damage: previousHealth - protector.health };
         }
 
         const previousHealth = target.health;
         target.health = Math.max(0, target.health - damage);
+        if (canTriggerReforge && previousHealth > 0 && !target.isAlive) {
+            target.queueReforge();
+        }
         this._broadcast.emit(BroadcastEvents.COMBAT_HIT, {
             source, target: targetView, action, shared, damage
         });
@@ -229,11 +229,11 @@ export class CombatManager {
     }
 
     private ignoresDefense(card: Card): boolean {
-        return Boolean(card.passiveEffect(EffectType.IgnoreDefense));
+        return card.isEmpowered || Boolean(card.passiveEffect(EffectType.IgnoreDefense));
     }
 
     private dodgeChance(source: Card, target: Card): number {
-        return this.ignoresDefense(source) ? 0 : target.passiveEffect(EffectType.Dodge)?.chance ?? 0;
+        return source.passiveEffect(EffectType.IgnoreDefense) ? 0 : target.passiveEffect(EffectType.Dodge)?.chance ?? 0;
     }
 
     private dodges(source: Card, target: Card): boolean {
@@ -259,16 +259,65 @@ export class CombatManager {
         return this.tankBlocks(source, target, AttackType.Ranged) ? Math.floor(source.attack / 2) : source.attack;
     }
 
-    private async playDodgeCounter(source: CardView, target: CardView): Promise<void> {
+    private async playDodgeCounter(source: CardView, target: CardView, allies: CardView[], opponents: CardView[]): Promise<void> {
         if (!this.hasDodgeCounter(source.card, target.card)) return;
         if (this.dodgeCounterBlocked(source.card, target.card)) {
             await this.playBlockedCounter(source);
             return;
         }
-        const damage = this.dodgeCounterDamage(source.card, target.card);
-        const dodged = this.dodges(source.card, target.card);
-        await this.playStrike(source, target, () =>
-            this.applyCombatDamage(source, target, damage, "Ranged counterattack", dodged));
+        await this.playCounter(source, target, allies, opponents, source.card.attack, 1, true);
+    }
+
+    private vowMonk(card: Card): Card | undefined {
+        const monk = card.activeEffects.find(effect => effect.type === EffectType.VowLink)?.source;
+        return monk && monk.health > 0 && !monk.isZombified && !monk.hasEffect(EffectType.Silence) ? monk : undefined;
+    }
+
+    private vowCounterSource(card: Card): Card | undefined {
+        const monk = this.vowMonk(card);
+        return monk && !monk.hasEffect(EffectType.Freeze) && !monk.isPhoenixEgg ? monk : undefined;
+    }
+
+    private async playCounter(
+        source: CardView, target: CardView, allies: CardView[], opponents: CardView[],
+        damage: number, strikes: number, ranged = false,
+    ): Promise<CardView | undefined> {
+        const substitute = allies.find(view => view.card === this.vowCounterSource(source.card));
+        const intercept = opponents.find(view => view.card === this.vowMonk(target.card));
+        const striker = substitute ?? source;
+        const recipient = intercept ?? target;
+        if (substitute) {
+            this.consumeVow(source, substitute, `Monk counterattacks for ${source.card.name}.`);
+            damage = substitute.card.attack;
+            strikes = 1;
+        }
+        if (intercept) this.consumeVow(target, intercept, `Monk intercepts the counterattack for ${target.card.name}.`);
+        if (ranged && this.tankBlocks(striker.card, recipient.card, AttackType.Ranged)) damage = Math.floor(damage / 2);
+        const dodged = this.dodges(striker.card, recipient.card);
+        // Extra bites animate separately but resolve as one counter hit.
+        for (let head = 1; head < strikes; head++) await this.playStrike(striker, recipient, () => 0);
+        await this.playStrike(striker, recipient, () =>
+            this.applyCombatDamage(striker, recipient, damage, ranged ? "Ranged counterattack" : "Counterattack", dodged));
+        this.clearFallenVows(opponents);
+        return dodged && recipient === target ? striker : undefined;
+    }
+
+    private clearFallenVows(views: CardView[]): void {
+        for (const view of views) {
+            const link = view.card.activeEffects.find(effect => effect.type === EffectType.VowLink);
+            if (link?.source && !link.source.isAlive) {
+                view.card.removeEffect(EffectType.VowLink);
+                view.updateStats();
+            }
+        }
+    }
+
+    private consumeVow(linked: CardView, monk: CardView, message: string): void {
+        linked.card.removeEffect(EffectType.VowLink);
+        linked.updateStats();
+        this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+            targetView: monk, abilityName: monk.card.skill?.name, message, color: "#b6f1e3",
+        });
     }
 
     private previewDamage(source: Card, target: Card, damage: number): number {
@@ -293,28 +342,41 @@ export class CombatManager {
 
     public previewCombat(attacker: Card, defender: Card) {
         const reduction = this.tankBlocks(attacker, defender) ? 0.5 : 1;
-        const normal = this.previewDamage(attacker, defender, defender.amplifyIncomingDamage(Math.floor(attacker.attack * reduction)));
+        const normalHit = defender.amplifyIncomingDamage(Math.floor(attacker.attack * reduction));
+        const normal = this.previewDamage(attacker, defender, normalHit);
         const critChance = this.attackCritChance(attacker);
-        const critical = critChance > 0
-            ? this.previewDamage(attacker, defender, defender.amplifyIncomingDamage(Math.floor(attacker.attack * 2 * reduction)))
+        const criticalHit = critChance > 0
+            ? defender.amplifyIncomingDamage(Math.floor(attacker.attack * 2 * reduction))
             : null;
+        const critical = criticalHit === null ? null : this.previewDamage(attacker, defender, criticalHit);
         const canCounter = attacker.attackType === AttackType.Melee && !attacker.hasEffect(EffectType.Invisible)
             && !defender.isPhoenixEgg && !defender.isOnLastHunt && !defender.hasEffect(EffectType.Freeze);
         const baseCounterDamage = this.calculateCounterDamage(defender);
-        const counterAfterHit = (incomingDamage: number): number => {
+        const substitute = this.vowCounterSource(defender);
+        const protector = this.livingProtector(defender);
+        const survivingSubstitute = (hit: number, damage: number) =>
+            substitute && substitute === protector && hit - damage >= substitute.health ? undefined : substitute;
+        const counterSource = survivingSubstitute(normalHit, normal);
+        const counterSourceAfterCritical = criticalHit === null ? undefined : survivingSubstitute(criticalHit, critical!);
+        const striker = counterSource ?? defender;
+        const recipient = this.vowMonk(attacker) ?? attacker;
+        const counterAfterHit = (incomingDamage: number, replacement?: Card): number => {
             if (!canCounter) return 0;
             const strikes = this.counterStrikeCount(defender, defender.health - incomingDamage);
-            return this.previewDamage(defender, attacker, baseCounterDamage + strikes - 1);
+            const damage = baseCounterDamage + strikes - 1;
+            return this.previewDamage(replacement ?? defender, recipient, replacement && damage > 0 ? replacement.attack : damage);
         };
-        const counter = counterAfterHit(normal);
-        const counterAfterCritical = critical === null ? null : counterAfterHit(critical);
-        const counterCritChance = canCounter ? defender.passiveEffect(EffectType.CritBoost)?.chance ?? 0 : 0;
-        const counterCritical = counterCritChance > 0 ? this.previewDamage(defender, attacker, defender.attack * 2) : null;
+        const counter = counterAfterHit(normal, counterSource);
+        const counterAfterCritical = critical === null ? null : counterAfterHit(critical, counterSourceAfterCritical);
+        const counterCritChance = canCounter && !counterSource ? defender.passiveEffect(EffectType.CritBoost)?.chance ?? 0 : 0;
+        const counterCritical = counterCritChance > 0 ? this.previewDamage(defender, recipient, defender.attack * 2) : null;
         const dodgeCounter = this.dodgeChance(attacker, defender) > 0 && this.canCounterOnDodge(defender, attacker)
-            ? this.previewDamage(defender, attacker, this.dodgeCounterDamage(defender, attacker)) : null;
+            ? this.previewDamage(substitute ?? defender, recipient, this.dodgeCounterDamage(substitute ?? defender, recipient)) : null;
         return { normal, critical, counter, counterAfterCritical, counterCritical, critChance, counterCritChance, dodgeCounter,
+            counterRecipient: recipient === attacker ? undefined : recipient,
+            counterSource, counterSourceAfterCritical, dodgeCounterSource: substitute,
             dodgeChance: this.dodgeChance(attacker, defender),
-            counterDodgeChance: canCounter ? this.dodgeChance(defender, attacker) : 0 };
+            counterDodgeChance: canCounter ? this.dodgeChance(striker, recipient) : 0 };
     }
 
     // Helper function to get initial health from character data
@@ -373,7 +435,7 @@ export class CombatManager {
             if (!card) continue;
 
             if (card.classType === ClassType.Warrior && !card.isZombified && card.health > 0
-                && !card.warriorRageUsed && !card.blocksStatRecovery) {
+                && !card.warriorRageUsed && !card.blocksStatBuffs) {
                 const initialHealth = this.getInitialHealth(card);
                 const currentHealthPercentage = (card.health / initialHealth) * 100;
 
@@ -405,7 +467,7 @@ export class CombatManager {
         }
     }
 
-    public async resolveArcaneBlast(attacker: CardView, opponentCardViews: CardView[]): Promise<void> {
+    public async resolveArcaneBlast(attacker: CardView, opponentCardViews: CardView[], allies: CardView[] = [attacker]): Promise<void> {
         // IMPORTANT: Only apply if the attacker is actually a Mage
         if (attacker.card.classType !== ClassType.Mage || attacker.card.isZombified || attacker.card.isPhoenixEgg || !attacker.card.isAlive) {
             //console.log(`ERROR: MageAbility called for non-Mage card: ${attacker.Name} (ClassType: ${attacker.ClassType})`);
@@ -439,7 +501,7 @@ export class CombatManager {
             }
             return mageDamage;
         });
-        if (dodged) await this.playDodgeCounter(targetView, attacker);
+        if (dodged) await this.playDodgeCounter(targetView, attacker, opponentCardViews, allies);
     }
 
     private getRandomOpponentTarget(attacker: Card, opponentCardViews: CardView[]): Card | null {
@@ -470,7 +532,7 @@ export class CombatManager {
             effect.type === EffectType.ThunderMark && effect.source === attacker.card);
         await this.playStrike(attacker, target, () => {
             const damage = this.applyCombatDamage(attacker, target, marked ? 2 : 1, "Lightning");
-            const canMark = target.card.isAlive && !target.card.blocksDebuff(EffectType.ThunderMark);
+            const canMark = target.card.isAlive && !target.card.blocksEffect(EffectType.ThunderMark);
             if (canMark) {
                 target.card.addEffect({
                     type: EffectType.ThunderMark, target: target.card, source: attacker.card,

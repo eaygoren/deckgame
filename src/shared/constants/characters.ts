@@ -9,7 +9,7 @@ export const Characters = {
     Assassin: "Assassin", // Normal saldırıda %50, yakın dövüş karşı saldırısında %25 kritik şansına sahiptir.
     Banshee: "Banshee", // Normal saldırı ve Arcane Blast ile hasar verdiği, hayatta kalan hedefleri korkutur.
     Cerberus: "Cerberus", // Canına göre 1–3 başla saldırır ve karşılık verir.
-    Cyborg: "Cyborg", // saldırmadığı her tur, saldırı gücünü kalıcı olarak 1 artırır //TODO
+    Cyborg: "Cyborg", // Maçta bir kez ölümcül normal saldırı veya karşı saldırı hasarında desteye döner. Çekildiğinde yarı temel canla ve kalıcı Empowered ile gelir. Buff ve debuff almaz, hasar azaltma ve paylaşımını aşar. Kaçınma geçerlidir.
     Cyclop: "Cyclop",
     Deathknight: "Deathknight", // dost birim öldüğünde desteye 1 adet skeleton ekler //TODO
     Dragon: "Dragon", // Saldırı sonrası hedefi 1 hasarlık yakar ve hedefin saldırısını 1 tur boyunca %50 düşürür.
@@ -32,7 +32,7 @@ export const Characters = {
     // Medusa: "Medusa",
     Mimic: "Mimic", // İsabet eden normal saldırıda hedefin saldırı öncesi, saldırı sonrası veya öldürmede çalışan yeteneğini kopyalar. Kopya sonraki kendi turundaki normal saldırıda koşulu sağlanınca çalışır ve kullanıldığında ya da tur sonunda silinir.
     // Minotaur: "Minotaur",
-    Monk: "Monk",
+    Monk: "Monk", // Tur başında en düşük canlı diğer müttefiğe tek kullanımlık bağ kurar. Monk gelen karşı hasarı üstlenir veya müttefikin yerine kendi saldırısıyla karşılık verir.
     // Mummy: "Mummy",
     // Naga: "Naga",
     Necromancer: "Necromancer", // Bir rakibi öldürdüğünde, maçta bir kez, rastgele ölü bir müttefiki 1 canla desteye geri koyar ve o kartın tur bazlı yetenek kullanımını sıfırlar.
@@ -61,7 +61,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Aerwyn,
         cover: Characters.Aerwyn.toLowerCase(),
         attack: 4,
-        health: 6,
+        health: 5,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
@@ -121,7 +121,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Banshee,
         cover: Characters.Banshee.toLowerCase(),
         attack: 5,
-        health: 6,
+        health: 5,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
@@ -145,7 +145,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Cyborg,
         cover: Characters.Cyborg.toLowerCase(),
         attack: 7,
-        health: 7,
+        health: 8,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Melee,
@@ -205,7 +205,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Ent,
         cover: Characters.Ent.toLowerCase(),
         attack: 4,
-        health: 10,
+        health: 9,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
@@ -252,7 +252,7 @@ export const CharacterList: CharacterListType = {
     Gunslinger: {
         name: Characters.Gunslinger,
         cover: Characters.Gunslinger.toLowerCase(),
-        attack: 6,
+        attack: 5,
         health: 6,
         rarity: Rarity.Rare,
         color: Color.Rare,
@@ -276,7 +276,7 @@ export const CharacterList: CharacterListType = {
     Herbalist: {
         name: Characters.Herbalist,
         cover: Characters.Herbalist.toLowerCase(),
-        attack: 4,
+        attack: 3,
         health: 5,
         rarity: Rarity.Common,
         color: Color.Common,
@@ -300,7 +300,7 @@ export const CharacterList: CharacterListType = {
     Hydra: {
         name: Characters.Hydra,
         cover: Characters.Hydra.toLowerCase(),
-        attack: 5,
+        attack: 8,
         health: 8,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
@@ -312,7 +312,7 @@ export const CharacterList: CharacterListType = {
     Illusionist: {
         name: Characters.Illusionist,
         cover: Characters.Illusionist.toLowerCase(),
-        attack: 5,
+        attack: 4,
         health: 7,
         rarity: Rarity.Common,
         color: Color.Common,
@@ -361,7 +361,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Luxen,
         cover: Characters.Luxen.toLowerCase(),
         attack: 4,
-        health: 6,
+        health: 7,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
@@ -373,7 +373,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Mimic,
         cover: Characters.Mimic.toLowerCase(),
         attack: 4,
-        health: 5,
+        health: 4,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
@@ -384,8 +384,8 @@ export const CharacterList: CharacterListType = {
     Monk: {
         name: Characters.Monk,
         cover: Characters.Monk.toLowerCase(),
-        attack: 5,
-        health: 10,
+        attack: 4,
+        health: 8,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Melee,
@@ -409,7 +409,7 @@ export const CharacterList: CharacterListType = {
         name: Characters.Ninja,
         cover: Characters.Ninja.toLowerCase(),
         attack: 6,
-        health: 6,
+        health: 5,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Ranged,
@@ -444,7 +444,7 @@ export const CharacterList: CharacterListType = {
     Reaper: {
         name: Characters.Reaper,
         cover: Characters.Reaper.toLowerCase(),
-        attack: 9,
+        attack: 10,
         health: 7,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
@@ -540,8 +540,8 @@ export const CharacterList: CharacterListType = {
     Void: {
         name: Characters.Void,
         cover: Characters.Void.toLowerCase(),
-        attack: 5,
-        health: 6,
+        attack: 4,
+        health: 9,
         rarity: Rarity.Legendary,
         color: Color.Legendary,
         attackType: AttackType.Ranged,
@@ -588,8 +588,8 @@ export const CharacterList: CharacterListType = {
     Zombie: {
         name: Characters.Zombie,
         cover: Characters.Zombie.toLowerCase(),
-        attack: 5,
-        health: 9,
+        attack: 3,
+        health: 7,
         rarity: Rarity.Rare,
         color: Color.Rare,
         attackType: AttackType.Melee,

@@ -42,6 +42,7 @@ export class Deck {
     const card = available[idx];
     // Remove the card from the deck
     this._cards = this._cards.filter((c) => c !== card);
+    card.completeReforge();
     return card;
   }
 

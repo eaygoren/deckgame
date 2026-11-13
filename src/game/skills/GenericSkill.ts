@@ -81,7 +81,8 @@ export class GenericSkill extends BaseSkill {
 
         const actualTarget = targetCard || caster;
         const appliedType = effectConfig.type === EffectType.Zombify ? EffectType.ZombifyPending : effectConfig.type;
-        if (targetCard instanceof Card && targetCard.blocksDebuff(appliedType)) return { success: false };
+        if (targetCard instanceof Card && appliedType !== EffectType.Heal && appliedType !== EffectType.LifeSteal
+            && targetCard.blocksEffect(appliedType)) return { success: false };
 
         switch (effectConfig.type) {
             case EffectType.Invisible:
@@ -143,6 +144,8 @@ export class GenericSkill extends BaseSkill {
             case EffectType.Protection:
                 if (!targetCard) return { success: false };
                 return this.applyProtection(caster, targetCard, effectConfig);
+            case EffectType.VowLink:
+                return this.applyStatus(actualTarget, effectConfig, 1, caster);
             case EffectType.SummonAlly:
                 return this.applySummon(caster, effectConfig, context!);
             case EffectType.SummonDeadAlly:
@@ -174,6 +177,12 @@ export class GenericSkill extends BaseSkill {
             case TargetType.Enemy:
                 return target || null;
             case TargetType.LowestHpAlly:
+                if (effectConfig.type === EffectType.VowLink) {
+                    const allies = (context?.allPlayerCards ?? []).filter(card => card !== caster && card.isAlive);
+                    const lowest = Math.min(...allies.map(card => card.health));
+                    const tied = allies.filter(card => card.health === lowest);
+                    return tied[Math.floor((context?.random ?? Math.random)() * tied.length)] ?? null;
+                }
                 return this.findLowestHpAlly(context?.allPlayerCards?.filter(card => !effectConfig.excludeCaster || card !== caster));
             case TargetType.RandomAlly: {
                 const allies = context?.allPlayerCards;
@@ -272,7 +281,7 @@ export class GenericSkill extends BaseSkill {
     }
 
     private applyBuff(target: Card, config: EffectConfig): SkillResult {
-        if (target.blocksStatRecovery) return { success: false };
+        if (target.blocksStatBuffs) return { success: false };
         const buffAmount = config.value || 1;
 
         if (target.attack !== undefined && target.health !== undefined) {
@@ -445,7 +454,7 @@ export class GenericSkill extends BaseSkill {
             return { success: false };
         }
 
-        if (!caster.blocksStatRecovery && target.attack > caster.unreducedAttack) {
+        if (!caster.blocksStatBuffs && target.attack > caster.unreducedAttack) {
             caster.increaseAttack(target.attack - caster.unreducedAttack);
 
             return {

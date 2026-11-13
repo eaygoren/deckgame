@@ -30,6 +30,24 @@ export const fearIcon: IconShape = [
 ];
 
 export const effectBadges: Partial<Record<EffectType, EffectBadge>> = {
+  [EffectType.VowLink]: {
+    category: "buff",
+    label: "Vow Link",
+    path: [{
+      d: "M13.7 7.2a4.5 4.5 0 1 0-6.5 6.5l1.5 1.5m1.6 1.6a4.5 4.5 0 1 0 6.5-6.5l-1.5-1.5M9 15l6-6",
+      transform: "translate(12 12) scale(1.2) translate(-12 -12)",
+    }],
+  },
+  [EffectType.Empowered]: {
+    category: "buff",
+    label: "Empowered",
+    path: [
+      { d: "M21.6 12a9.6 4.3 0 1 0-19.2 0 9.6 4.3 0 1 0 19.2 0Z", strokeWidth: 1.05 },
+      { d: "M21.6 12a9.6 4.3 0 1 0-19.2 0 9.6 4.3 0 1 0 19.2 0Z", strokeWidth: 1.05, transform: "rotate(60 12 12)" },
+      { d: "M21.6 12a9.6 4.3 0 1 0-19.2 0 9.6 4.3 0 1 0 19.2 0Z", strokeWidth: 1.05, transform: "rotate(-60 12 12)" },
+      { d: "M13.8 12a1.8 1.8 0 1 0 -3.6 0a1.8 1.8 0 1 0 3.6 0Z M22.35 10.5a1.35 1.35 0 1 0 -2.7 0a1.35 1.35 0 1 0 2.7 0Z M8.65 4a1.35 1.35 0 1 0 -2.7 0a1.35 1.35 0 1 0 2.7 0Z M8.65 20a1.35 1.35 0 1 0 -2.7 0a1.35 1.35 0 1 0 2.7 0Z", filled: true },
+    ],
+  },
   [EffectType.VoidLock]: { category: "debuff", label: "Void Lock", path: "M7.5 10V7a4.5 4.5 0 0 1 9 0v3M6.3 10h11.4a1.8 1.8 0 0 1 1.8 1.8v6.4a1.8 1.8 0 0 1-1.8 1.8H6.3a1.8 1.8 0 0 1-1.8-1.8v-6.4A1.8 1.8 0 0 1 6.3 10Z M10.2 13.2l3.6 3.6m0-3.6-3.6 3.6" },
   [EffectType.PhoenixEgg]: { category: "buff", label: "Phoenix Egg", path: "M12 2.7c-3.5 0-7.1 6.6-7.1 11.6a7.1 7.1 0 0 0 14.2 0C19.1 9.3 15.5 2.7 12 2.7Z M5.2 11.8l4.1 1.5 2.3-3.7 2.7 5 4.3-2.6" },
   [EffectType.SkillCopy]: { category: "buff", label: "Copied Ability", path: "M14.5 4H5.8a1.7 1.7 0 0 0-1.7 1.7v9.1M9.5 8h8.8a1.7 1.7 0 0 1 1.7 1.7v8.6a1.7 1.7 0 0 1-1.7 1.7H9.5a1.7 1.7 0 0 1-1.7-1.7V9.7A1.7 1.7 0 0 1 9.5 8Z M14 10.8v6.4m-3.2-3.2h6.4" },
@@ -107,7 +125,7 @@ export function appendIconPaths(icon: SVGSVGElement, shape: IconShape): void {
 }
 
 export function effectDuration(effect: SkillEffect): string {
-  if (effect.type === EffectType.Protection) return "Until the start of this team's next turn";
+  if (effect.type === EffectType.Protection || effect.type === EffectType.VowLink) return "Until the start of this team's next turn";
   if (effect.type === EffectType.Invisible) {
     return effect.duration > 1 ? "Until the end of this team's next turn" : "Until the end of this team's turn";
   }
@@ -135,6 +153,8 @@ export function effectDetails(effect: Pick<SkillEffect, "type" | "value" | "prot
       return `Takes ${effect.value || 1} damage at the end of its turn.`;
     case EffectType.Freeze:
       return "This card cannot attack or counterattack.";
+    case EffectType.VowLink:
+      return "Monk takes counterattack damage for this ally or counterattacks in their place using his own attack. The link ends after one use.";
     case EffectType.Protection:
       if (effect.protector && effect.protector.health <= 0) {
         return "Damage sharing has ended because the protector fell.";
@@ -142,6 +162,8 @@ export function effectDetails(effect: Pick<SkillEffect, "type" | "value" | "prot
       return `${effect.protector?.name ?? "The protector"} absorbs up to half the incoming combat damage, capped by their remaining HP. This card takes the rest.`;
     case EffectType.Mark:
       return "The marked target takes 50% more damage from normal attacks.";
+    case EffectType.Empowered:
+      return "This card cannot gain buffs or debuffs. Its attacks bypass damage reduction and damage sharing.";
     case EffectType.ThunderMark:
       return "Zeus’s lightning deals 1 damage to an unmarked target and 2 to a target he has already marked.";
     case EffectType.LastHunt:

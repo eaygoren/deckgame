@@ -132,7 +132,8 @@ export class BotAI {
         const counterDamage = Math.floor((preview.counter + (preview.counterCritical === null ? 0 :
             (preview.counterCritical - preview.counter) * preview.counterCritChance)) * (1 - preview.counterDodgeChance));
         const attackerTakesCounterDamage = attacker.attackType === AttackType.Melee;
-        const attackerWillDie = attackerTakesCounterDamage && !attacker.isOnLastHunt && attacker.health <= counterDamage;
+        const attackerWillDie = attackerTakesCounterDamage && !preview.counterRecipient
+            && !attacker.isOnLastHunt && attacker.health <= counterDamage;
 
         if (attacker.unitType === UnitType.Leader && attackerWillDie) {
             return -10000; // Çok düşük skor ver, asla seçilmesin

@@ -2,6 +2,14 @@ import { appendIconPaths, createEffectBadge, fearIcon, lastHuntIconPath, threeHe
 import type { IconShape } from "./battleEffects";
 
 const abilityIcons: Partial<Record<string, { color: string; path: IconShape }>> = {
+  "Guardian’s Vow": {
+    color: "#b6f1e3",
+    path: "M7 7a2.5 2.5 0 1 0-5 0 2.5 2.5 0 1 0 5 0Zm15 10a2.5 2.5 0 1 0-5 0 2.5 2.5 0 1 0 5 0ZM7 7h3a3 3 0 0 1 0 6h-1a2 2 0 0 0 0 4h8",
+  },
+  "Reforge Protocol": {
+    color: "#b6f1e3",
+    path: "M7.6 5.5h8.8a2.1 2.1 0 0 1 2.1 2.1v8.8a2.1 2.1 0 0 1-2.1 2.1H7.6a2.1 2.1 0 0 1-2.1-2.1V7.6a2.1 2.1 0 0 1 2.1-2.1ZM9 3v2.5m6-2.5v2.5m-6 13V21m6-2.5V21M3 9h2.5M3 15h2.5m13-6H21m-2.5 6H21m-9-6.3 3.3 3.3-3.3 3.3L8.7 12Z",
+  },
   "Threefold Bite": {
     color: "#ffb48e",
     path: threeHeadsIconPath,

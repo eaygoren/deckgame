@@ -19,6 +19,7 @@ const battleAbilityBadges: ReadonlyMap<string, BattleAbilityBadge> = new Map([
   ["Reality Swap", { detail: "Swaps the target's attack and HP before attacking.", once: true }],
   ["Raise Dead", { detail: "Returns a fallen ally to the deck after a kill.", once: true }],
   ["Ashes to Life", { detail: "Turns into an egg after lethal damage.", once: true, replacedBy: EffectType.PhoenixEgg }],
+  ["Reforge Protocol", { detail: "Returns to the deck after a lethal attack or counterattack, then comes back Empowered.", once: true, replacedBy: EffectType.Empowered }],
   ["Last Hunt", { detail: "Survives a lethal counterattack at 0 HP.", once: true, replacedBy: EffectType.LastHunt }],
 ]);
 

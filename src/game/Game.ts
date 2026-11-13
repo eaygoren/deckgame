@@ -284,16 +284,24 @@ export class Game {
 
     const attacker = this._attacker.card;
     const { normal, critical, counter, counterAfterCritical, counterCritical, critChance,
-      counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter } = this._combatManager.previewCombat(attacker, target.card);
+      counterCritChance, dodgeChance, counterDodgeChance, dodgeCounter, counterRecipient, counterSource,
+      counterSourceAfterCritical, dodgeCounterSource } =
+      this._combatManager.previewCombat(attacker, target.card);
     const parts = [target.card.name + " · Damage " + normal];
     if (critical !== null) parts.push(`Critical ${critical} (${critChance * 100}%)`);
     if (dodgeChance > 0) parts.push(`Target dodge chance ${dodgeChance * 100}%`);
-    if (dodgeCounter !== null) parts.push(`Ranged counter damage on dodge ${dodgeCounter}`);
-    parts.push(counterAfterCritical !== null && counterAfterCritical !== counter
-      ? `Counter damage ${counter} (normal hit) / ${counterAfterCritical} (critical hit)`
+    if (dodgeCounter !== null) parts.push(`Ranged counter damage on dodge ${dodgeCounter}${dodgeCounterSource ? ` from ${dodgeCounterSource.name}` : ""}`);
+    const splitCounter = counterAfterCritical !== null &&
+      (counterAfterCritical !== counter || (counter > 0 && counterSourceAfterCritical !== counterSource));
+    parts.push(splitCounter
+      ? `Counter damage ${counter} from ${(counterSource ?? target.card).name} (normal hit) / ${counterAfterCritical} from ${(counterSourceAfterCritical ?? target.card).name} (critical hit)`
       : "Counter damage " + counter);
     if (counterCritical !== null) parts.push(`Critical counter ${counterCritical} (${counterCritChance * 100}%)`);
     if (counterDodgeChance > 0) parts.push(`Counter dodge chance ${counterDodgeChance * 100}%`);
+    if (counter > 0 || (counterAfterCritical ?? 0) > 0 || (dodgeCounter ?? 0) > 0 || (counterCritical ?? 0) > 0) {
+      if (!splitCounter && counter > 0 && counterSource) parts.push(`${counterSource.name} counterattacks for ${target.card.name}`);
+      if (counterRecipient) parts.push(`${counterRecipient.name} takes the counter damage for ${attacker.name}`);
+    }
     if (attacker.skill?.triggerTiming === SkillTiming.BeforeAttack) parts.push("An ability may change these values");
     if (confirmWithTap) parts.push("Tap again to attack");
     this.clearDamagePreview();
@@ -407,7 +415,7 @@ export class Game {
                 !this.canTarget(defender, opponent, attacker)) continue;
             if (defender.unitType === UnitType.Leader) return true;
             const preview = this._combatManager.previewCombat(attacker, defender);
-            if (!attacker.isOnLastHunt &&
+            if (!preview.counterRecipient && !attacker.isOnLastHunt &&
                 Math.max(preview.counter, preview.counterCritical ?? 0, preview.dodgeCounter ?? 0) >= attacker.health) {
               return true;
             }
@@ -466,15 +474,16 @@ export class Game {
     const known = enemy.team.filter(card => enemy.hand.includes(card) || !card.isAlive);
     const knownNames = new Set(known.map(card => card.name));
     const available = reserveCandidates.filter(card => !knownNames.has(card.name));
-    const reserve: Card[] = [];
-    for (let index = 0; index < count && available.length; index++) {
+    const reserve = enemy.deck.cards.filter(card => card.isAwaitingReforge);
+    const knownReserve = new Set(reserve);
+    for (let index = reserve.length; index < count && available.length; index++) {
       const [stats] = available.splice(Math.floor(random() * available.length), 1);
       reserve.push(new Card(stats));
     }
     // Decks can exceed the deck builder limit after summons.
     enemy.deck.cards.length = 0;
     for (const card of reserve) enemy.deck.addCard(card);
-    enemy.team = [...known, ...reserve];
+    enemy.team = [...known.filter(card => !knownReserve.has(card)), ...reserve];
   }
 
   private scoreTeam(player: Player): number {
@@ -499,11 +508,12 @@ export class Game {
     this.updateBattleHud();
     let followUp: boolean;
     do {
-      const result = await this._combatManager.resolveCombat(attacker, defender, opponents);
+      const allies = this._turn === Turn.Player ? this._playerCardViews : this._botCardViews;
+      const result = await this._combatManager.resolveCombat(attacker, defender, opponents, allies);
       if (this.stopped) return;
       if (!result) break;
 
-      await this._combatManager.resolveArcaneBlast(attacker, opponents);
+      await this._combatManager.resolveArcaneBlast(attacker, opponents, allies);
       if (this.stopped) return;
       followUp = result.followUp;
       if (!followUp) await this._combatManager.resolveThunderMark(attacker, opponents);
@@ -587,6 +597,7 @@ export class Game {
     const activeViews = this._turn === Turn.Player ? this._playerCardViews : this._botCardViews;
     for (const view of activeViews) {
       view.card.removeEffect(EffectType.Protection);
+      view.card.removeEffect(EffectType.VowLink);
     }
 
     this.triggerStartOfTurnSkills();
@@ -677,7 +688,7 @@ export class Game {
     const allCardViews = [...this._playerCardViews, ...this._botCardViews];
 
     for (const cardView of allCardViews) {
-      cardView.card.removeFearFromFallenSources();
+      cardView.card.removeEffectsFromFallenSources();
       cardView.updateStats();
     }
   }
@@ -779,12 +790,26 @@ export class Game {
     const survivors = views.filter(view => !dead.includes(view));
     player.hand = survivors.map(view => view.card);
     for (const view of dead) {
+      if (!view.card.isAwaitingReforge) continue;
+      player.deck.addCard(view.card);
+      this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+        targetView: view, abilityName: view.card.skill?.name,
+        message: "Cyborg returned to the deck.", color: "#b6f1e3",
+      });
+    }
+    for (const view of dead) {
       const card = player.deck.drawRandomCard(this._combatManager.random);
       if (!card) break;
       player.hand.push(card);
       const replacement = this.mountCard(card, side, view.slot);
       survivors.push(replacement);
       this._animationManager.showNewCard(replacement);
+      if (card.isEmpowered) {
+        this._broadcast.emit(BroadcastEvents.SHOW_ABILITY_MESSAGE, {
+          targetView: replacement, abilityName: card.skill?.name,
+          message: "Cyborg returned Empowered.", color: "#b6f1e3",
+        });
+      }
     }
     return survivors;
   }

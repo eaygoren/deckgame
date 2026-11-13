@@ -64,6 +64,13 @@ export class SkillFactory {
             effects: [{ type: EffectType.ThreeHeads, target: TargetType.Self }]
         }],
 
+        [Characters.Cyborg, {
+            name: "Reforge Protocol",
+            description: "From the wreckage, a stronger core awakens. Once per match, if an attack or counterattack deals lethal damage to Cyborg, he returns to the deck. When drawn again, he enters play with half his base HP and permanent [[empowered]].",
+            triggerTiming: SkillTiming.Passive,
+            effects: [{ type: EffectType.Reforge, target: TargetType.Self }]
+        }],
+
         [Characters.Dragon, {
             name: "Dragon Fire",
             description: "Ancient flames burn with the fury of a thousand suns. After attacking, applies [[burn]] and [[attack_reduction]] to the target for one turn.",
@@ -168,6 +175,13 @@ export class SkillFactory {
             description: "Distant arrows vanish in Luxen's light. Ranged enemies cannot target Luxen unless he is under [[silence]] or is the last non-leader on his side and no enemy melee card can attack him.",
             triggerTiming: SkillTiming.Passive,
             effects: [{ type: EffectType.RangedTargetImmunity, target: TargetType.Self }]
+        }],
+
+        [Characters.Monk, {
+            name: "Guardian’s Vow",
+            description: "The monk carries the burdens of those who falter. At the start of your turn, grants [[vow_link]] to another ally with the lowest current HP, chosen randomly on a tie. The link lasts until used or until the start of your next turn.",
+            triggerTiming: SkillTiming.StartOfTurn,
+            effects: [{ type: EffectType.VowLink, target: TargetType.LowestHpAlly, excludeCaster: true }]
         }],
 
         [Characters.Mimic, {
