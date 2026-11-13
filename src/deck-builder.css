@@ -353,6 +353,20 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 5px;
 }
 .empty-units { color: var(--muted); font-size: .85rem; padding: 6px 0; }
+.deck-rarity-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 4px 2px;
+  color: #c6b9ad;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.deck-rarity-separator[data-rarity="Legendary"] { color: #ebba76; }
+.deck-rarity-separator[data-rarity="Rare"] { color: #9ac3ea; }
+.deck-rarity-separator .rarity-icon { flex: none; width: 16px; height: 16px; }
+.deck-rarity-separator::after { content: ""; flex: 1; border-top: 1px solid currentColor; opacity: .4; }
+.deck-rarity-count { order: 1; font-variant-numeric: tabular-nums; }
 .deck-entry {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) 33px;
@@ -365,6 +379,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: .85rem;
 }
 .deck-entry img { width: 34px; height: 34px; object-fit: cover; object-position: center 25%; }
+.deck-entry button { translate: 0 -3px; }
 .deck-entry button, .detail-close {
   border: 0;
   background: transparent;
@@ -372,7 +387,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-size: 1.25rem;
   min-height: 30px;
 }
-.deck-limits, #deck-status { font-size: .8rem; color: var(--muted); }
+#deck-status { font-size: .8rem; color: var(--muted); }
 #confirm-deck, #deck-toggle {
   width: 100%;
   padding: 11px 14px;
@@ -384,6 +399,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 #confirm-deck { display: flex; justify-content: space-between; }
 #confirm-deck:disabled { color: #d0b699; background: #44352d; border-color: #695340; cursor: default; }
+#clear-deck {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+}
+#clear-deck:disabled { opacity: .5; cursor: default; }
 #deck-toggle { display: none; }
 dialog {
   --dialog-padding: 26px;

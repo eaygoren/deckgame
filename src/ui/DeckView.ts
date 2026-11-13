@@ -47,6 +47,7 @@ export class DeckView {
   private readonly details: HTMLDialogElement;
   private readonly toggle: HTMLButtonElement;
   private readonly confirm: HTMLButtonElement;
+  private readonly clearDeck: HTMLButtonElement;
   private readonly status: HTMLElement;
   private busy = false;
 
@@ -60,6 +61,13 @@ export class DeckView {
     this.details = root.querySelector("#card-details")!;
     this.toggle = root.querySelector("#deck-toggle")!;
     this.confirm = root.querySelector("#confirm-deck")!;
+    this.clearDeck = root.querySelector("#clear-deck")!;
+    this.clearDeck.addEventListener("click", () => {
+      if (this.busy || !this.selected.size) return;
+      this.selected.clear();
+      this.render();
+      this.search.focus({ preventScroll: true });
+    });
     this.status = root.querySelector("#deck-status")!;
     const panel = root.querySelector("#deck-panel")!;
 
@@ -279,7 +287,18 @@ export class DeckView {
     leaderSlot.classList.toggle("empty-slot", !leader);
     leaderSlot.replaceChildren(leader ? this.deckEntry(leader, "div") : "♜  Choose a leader");
     const list = this.root.querySelector("#deck-cards")!;
-    list.replaceChildren(...units.map(card => this.deckEntry(card, "li")));
+    list.replaceChildren();
+    for (const rarity of [Rarity.Legendary, Rarity.Rare, Rarity.Common]) {
+      const group = units.filter(card => card.rarity === rarity);
+      const separator = document.createElement("li");
+      separator.className = "deck-rarity-separator";
+      separator.dataset.rarity = rarity;
+      const countLabel = document.createElement("span");
+      countLabel.className = "deck-rarity-count";
+      countLabel.textContent = `${rarityCounts[rarity]}/${limits[rarity]}`;
+      separator.append(rarityNames[rarity], createRarityIcon(rarity), countLabel);
+      list.append(separator, ...group.map(card => this.deckEntry(card, "li")));
+    }
     if (units.length === 0) {
       const empty = document.createElement("li");
       empty.className = "empty-units";
@@ -289,9 +308,9 @@ export class DeckView {
 
     this.root.querySelector("#deck-count")!.textContent = count + " / " + deckSize;
     this.root.querySelector<HTMLProgressElement>("#deck-progress")!.value = count;
-    this.root.querySelector("#deck-limits")!.textContent = "Legendary " + rarityCounts[Rarity.Legendary] + "/2 · Rare " + rarityCounts[Rarity.Rare] + "/4";
     this.toggle.textContent = "My deck · " + count + "/" + deckSize;
     this.confirm.disabled = this.busy || count !== deckSize || !leader;
+    this.clearDeck.disabled = this.busy || count === 0;
     const missingUnits = deckSize - 1 - units.length;
     const missing = [leader ? "" : "1 leader", missingUnits > 0 ? missingUnits + (missingUnits === 1 ? " unit" : " units") : ""].filter(Boolean);
     this.status.textContent = this.busy ? "Preparing the arena…" : missing.length ? "Choose " + missing.join(" and ") + " to complete your deck." : "Your deck is ready.";
