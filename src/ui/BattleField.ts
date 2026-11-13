@@ -8,6 +8,7 @@ import { Player } from "../game/Player";
 import { clockIconPath, createEffectBadge, effectBadges, effectDetails, effectDuration } from "./battleEffects";
 import { renderAbilityDescription } from "./abilityDescription";
 import { renderAbilityTitle } from "./abilityTitle";
+import { renderCardTags } from "./cardTags";
 import { createBattleAbilityStatus, replacementAbilityEffect } from "./battleAbilityBadge";
 
 export class BattleField {
@@ -91,6 +92,7 @@ export class BattleField {
 
   private renderCardStatus(card: Card, inArena: boolean): void {
     this.details.querySelector("#battle-detail-title")!.textContent = card.name;
+    renderCardTags(this.details.querySelector<HTMLElement>(".detail-tags")!, card);
     renderCardDetailTraits(this.details.querySelector("#battle-detail-meta")!, card);
     renderAbilityTitle(this.details.querySelector("#battle-detail-skill")!, card.skill?.name);
     renderAbilityDescription(this.details.querySelector("#battle-detail-description")!, card.skill?.description);

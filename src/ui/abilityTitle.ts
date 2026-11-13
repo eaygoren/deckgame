@@ -60,7 +60,7 @@ const abilityIcons: Partial<Record<string, { color: string; path: IconShape }>> 
   },
   "Last Breath": {
     color: "#b2dafa",
-    path: "M4.7 19.8v-8.9a7.3 7.3 0 0 1 14.6 0v8.9l-3.7-2.5-3.6 2.5-3.6-2.5-3.7 2.5ZM9 10.4v1.5m6-1.5v1.5m-4.2 2.5h2.4",
+    path: "M9.4 3.3h5.2a1 1 0 0 1 .7.3l4 4.3a1.1 1.1 0 0 1 .3 1l-2.8 11a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8l-2.8-11a1.1 1.1 0 0 1 .3-1l4-4.3a1 1 0 0 1 .7-.3ZM12 7.8v8.7m-3-5.9h6",
   },
   "Hunter's Mark": {
     color: "#ffb48e",

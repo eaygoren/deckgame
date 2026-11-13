@@ -7,6 +7,7 @@ import { attackTypeNames, cardClasses, classNames, createAttackTypeIcon, createC
 import { addMouseTilt } from "./cardTilt";
 import { renderAbilityDescription } from "./abilityDescription";
 import { renderAbilityTitle } from "./abilityTitle";
+import { createTagIcon, getCardTags, renderCardTags, tagNames } from "./cardTags";
 
 const deckSize = 10;
 const limits = { [Rarity.Legendary]: 2, [Rarity.Rare]: 4, [Rarity.Common]: deckSize };
@@ -14,7 +15,7 @@ const limits = { [Rarity.Legendary]: 2, [Rarity.Rare]: 4, [Rarity.Common]: deckS
 function addIconFilterOptions<T extends string>(
   select: HTMLSelectElement,
   values: T[],
-  names: Record<T, string>,
+  names: Record<T, string> | ((value: T) => string),
   createIcon: (value: T) => SVGSVGElement | undefined,
 ): void {
   const supportsOptionIcons = CSS.supports("appearance", "base-select");
@@ -25,7 +26,7 @@ function addIconFilterOptions<T extends string>(
     select.prepend(button);
   }
   for (const value of values) {
-    const option = new Option(names[value], value);
+    const option = new Option(typeof names === "function" ? names(value) : names[value], value);
     const icon = supportsOptionIcons ? createIcon(value) : undefined;
     if (icon) option.append(icon);
     select.add(option);
@@ -35,7 +36,6 @@ function addIconFilterOptions<T extends string>(
 export class DeckView {
   private readonly selected = new Set<Card>();
   private readonly cards = Object.values(CharacterList)
-    .filter(character => character.availabilityType === AvailabilityType.Playable)
     .map(character => character.unitType === UnitType.Leader ? new LeaderCard(character) : new Card(character));
   private readonly tiles = new Map<Card, { tile: HTMLElement; action: HTMLButtonElement; reason: HTMLElement }>();
   private readonly search: HTMLInputElement;
@@ -43,6 +43,7 @@ export class DeckView {
   private readonly cardClass: HTMLSelectElement;
   private readonly attackType: HTMLSelectElement;
   private readonly rarity: HTMLSelectElement;
+  private readonly tag: HTMLSelectElement;
   private readonly details: HTMLDialogElement;
   private readonly toggle: HTMLButtonElement;
   private readonly confirm: HTMLButtonElement;
@@ -55,6 +56,7 @@ export class DeckView {
     this.cardClass = root.querySelector("#card-class")!;
     this.attackType = root.querySelector("#card-attack-type")!;
     this.rarity = root.querySelector("#card-rarity")!;
+    this.tag = root.querySelector("#card-tag")!;
     this.details = root.querySelector("#card-details")!;
     this.toggle = root.querySelector("#deck-toggle")!;
     this.confirm = root.querySelector("#confirm-deck")!;
@@ -67,6 +69,7 @@ export class DeckView {
     addIconFilterOptions(this.cardClass, Object.values(ClassType), classNames, createClassIcon);
     addIconFilterOptions(this.attackType, Object.values(AttackType), attackTypeNames, createAttackTypeIcon);
     addIconFilterOptions(this.rarity, Object.values(Rarity), rarityNames, createRarityIcon);
+    addIconFilterOptions(this.tag, tagNames, tag => tag, createTagIcon);
 
     const grid = root.querySelector("#card-grid")!;
     for (const card of this.cards) grid.append(this.createTile(card));
@@ -94,7 +97,7 @@ export class DeckView {
     });
     sortCards();
     this.search.addEventListener("input", () => this.filter());
-    for (const filter of [this.unit, this.cardClass, this.attackType, this.rarity]) {
+    for (const filter of [this.unit, this.cardClass, this.attackType, this.rarity, this.tag]) {
       filter.addEventListener("change", () => this.filter());
     }
 
@@ -142,6 +145,10 @@ export class DeckView {
     return [...this.selected].find(card => card instanceof LeaderCard) as LeaderCard | undefined;
   }
 
+  private isDeckEligible(card: Card): boolean {
+    return CharacterList[card.name as keyof typeof CharacterList]?.availabilityType === AvailabilityType.Playable;
+  }
+
   private filter(): void {
     const query = this.search.value.trim().toLowerCase();
     let count = 0;
@@ -150,7 +157,8 @@ export class DeckView {
         && (!this.unit.value || card.unitType === this.unit.value)
         && (!this.cardClass.value || cardClasses(card).some(type => type === this.cardClass.value))
         && (!this.attackType.value || card.attackType === this.attackType.value)
-        && (!this.rarity.value || card.rarity === this.rarity.value);
+        && (!this.rarity.value || card.rarity === this.rarity.value)
+        && (!this.tag.value || getCardTags(card).some(tag => tag === this.tag.value));
       tile.hidden = !visible;
       if (visible) count++;
     }
@@ -197,6 +205,7 @@ export class DeckView {
     health.textContent = "♥ " + card.health;
     health.setAttribute("aria-label", "HP " + card.health);
     const reason = action.querySelector<HTMLElement>(".card-reason")!;
+    action.querySelector<HTMLElement>(".card-mark")!.hidden = !this.isDeckEligible(card);
     action.addEventListener("click", () => {
       if (this.busy || action.getAttribute("aria-disabled") === "true") return;
       if (!this.selected.delete(card)) this.selected.add(card);
@@ -211,6 +220,7 @@ export class DeckView {
     info.addEventListener("click", () => {
       renderCardDetailTraits(this.details.querySelector("#detail-category")!, card);
       this.details.querySelector("#detail-title")!.textContent = card.name;
+      renderCardTags(this.details.querySelector<HTMLElement>(".detail-tags")!, card);
       this.details.querySelector("#detail-attack")!.textContent = `⚔ Attack ${card.attack}`;
       this.details.querySelector("#detail-health")!.textContent = `♥ HP ${card.health}`;
       renderAbilityTitle(this.details.querySelector("#detail-skill")!, card.skill?.name);
@@ -252,7 +262,8 @@ export class DeckView {
 
     for (const [card, { tile, action, reason }] of this.tiles) {
       const picked = this.selected.has(card);
-      const blocked = picked ? "" : count >= deckSize ? "Deck is full"
+      const blocked = !this.isDeckEligible(card) ? "Summon only"
+        : picked ? "" : count >= deckSize ? "Deck is full"
         : card instanceof LeaderCard && leader ? "Leader slot is full"
         : !(card instanceof LeaderCard) && units.length === deckSize - 1 ? "Unit slots are full"
         : rarityCounts[card.rarity] >= limits[card.rarity] ? "Rarity limit reached" : "";

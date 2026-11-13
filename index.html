@@ -26,6 +26,7 @@
                     <label>Class<select id="card-class" class="icon-filter"><option value="">All</option></select></label>
                     <label>Attack type<select id="card-attack-type" class="icon-filter"><option value="">All</option></select></label>
                     <label>Rarity<select id="card-rarity" class="icon-filter"><option value="">All</option></select></label>
+                    <label>Tag<select id="card-tag" class="icon-filter"><option value="">All</option></select></label>
                     <div class="collection-sort">
                         <label>Sort by<select id="card-sort"><option value="name">Name</option><option value="attack">Attack</option><option value="health">HP</option></select></label>
                         <button id="sort-direction" type="button" aria-label="Sort direction: Ascending" title="Ascending order">↑</button>
@@ -53,6 +54,7 @@
         <dialog id="card-details" aria-labelledby="detail-title">
             <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
             <h2 id="detail-title"></h2>
+            <div class="detail-tags" hidden></div>
             <p class="deck-kicker" id="detail-category"></p>
             <p class="card-stats detail-stats"><span id="detail-attack"></span><span id="detail-health"></span></p>
             <h3 id="detail-skill"></h3>
@@ -105,6 +107,7 @@
         <dialog id="battle-card-details" aria-labelledby="battle-detail-title">
             <form method="dialog"><button class="detail-close" aria-label="Close">×</button></form>
             <h2 id="battle-detail-title"></h2>
+            <div class="detail-tags" hidden></div>
             <p id="battle-detail-meta"></p>
             <p class="card-stats detail-stats">
                 <span id="battle-detail-attack"></span>

@@ -1,4 +1,5 @@
 :root {
+  --popup-alpha: 0.9;
   color-scheme: dark;
   font-family: system-ui, sans-serif;
   color: #eee8df;
@@ -43,6 +44,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .deck-builder.is-scaled .deck-header h1 { font-size: 4.8rem; }
 .deck-builder.is-scaled .deck-panel { max-height: 1044px; }
 .deck-header, .deck-layout { max-width: 1520px; margin-inline: auto; }
+.deck-builder.is-scaled :is(.deck-header, .deck-layout) {
+  /* Add one original card column and its gap to the desktop canvas. */
+  max-width: calc(1520px + (1520px - 300px - 24px + 14px) / 6);
+}
 .deck-header { margin-bottom: 32px; }
 .deck-kicker {
   color: var(--gold);
@@ -93,7 +98,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     margin-top: 4px;
     border: 1px solid var(--line);
     border-radius: 7px;
-    background: #201c21;
+    background: rgb(32 28 33 / var(--popup-alpha));
     color: #eee8df;
   }
   .icon-filter > button, .icon-filter selectedcontent, .icon-filter option {
@@ -103,7 +108,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
     gap: 8px;
   }
   .icon-filter option { padding: 8px; }
-  .icon-filter :is(.rarity-icon, .class-icon, .attack-type-icon, .leader-icon) { width: 20px; height: 20px; margin-inline-start: auto; }
+  .icon-filter :is(.rarity-icon, .class-icon, .attack-type-icon, .leader-icon, .tag-icon) {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-inline-start: auto;
+  }
 }
 #sort-direction { width: 42px; color: var(--gold); font-size: 1.1rem; }
 #sort-direction:hover { border-color: var(--gold); }
@@ -112,6 +122,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(max(145px, calc((100% - 5 * var(--card-gap)) / 6)), 1fr));
   gap: var(--card-gap);
+}
+.deck-builder.is-scaled :is(.card-grid, .collection-filters) {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 14px;
 }
 .collection-card {
   --card-header-max-size: 27px;
@@ -372,18 +386,50 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 #confirm-deck:disabled { color: #d0b699; background: #44352d; border-color: #695340; cursor: default; }
 #deck-toggle { display: none; }
 dialog {
+  --dialog-padding: 26px;
   width: min(430px, calc(100% - 36px));
-  padding: 26px;
+  padding: var(--dialog-padding);
   border: 1px solid #7b5e3d;
   border-radius: 12px;
-  background: #241e25;
+  background: rgb(36 30 37 / var(--popup-alpha));
   color: #eee8df;
 }
 dialog::backdrop { background: #100c13b8; }
 dialog h2 { font: 700 2rem Georgia, serif; margin: 0 0 16px; }
 dialog h3 { color: var(--gold); font-size: 1rem; }
-:is(#card-details, #battle-card-details) { padding-block-start: 48px; }
-:is(#detail-title, #battle-detail-title) { text-align: center; }
+:is(#detail-title, #battle-detail-title) {
+  padding-inline: 32px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.detail-tags:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-block: -8px 12px;
+}
+.detail-tags > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5.4px;
+  padding: 2.7px 10.8px;
+  border: 1.35px solid currentColor;
+  border-radius: 999px;
+  font-size: 1.0125rem;
+  line-height: 1.4;
+}
+.detail-tags .tag-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+.tag-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 :is(#detail-category, #battle-detail-meta) {
   display: flex;
   align-items: baseline;
@@ -419,6 +465,7 @@ dialog h3 { color: var(--gold); font-size: 1rem; }
 :is(#detail-description, #battle-detail-description) { text-align: justify; }
 dialog > p:last-child { color: #d1c5c5; line-height: 1.55; }
 .detail-close { position: absolute; top: 8px; right: 10px; min-width: 32px; }
+:is(#card-details, #battle-card-details) .detail-close { top: 10px; }
 
 .ability-title-icon {
   width: 1.25em;
@@ -456,7 +503,7 @@ dialog > p:last-child { color: #d1c5c5; line-height: 1.55; }
   padding: 8px 12px;
   border: 1px solid #a47957;
   border-radius: 6px;
-  background: #19141b;
+  background: rgb(25 20 27 / var(--popup-alpha));
   color: #eee8df;
   font-size: .875rem;
   line-height: 1.4;
@@ -466,7 +513,7 @@ dialog > p:last-child { color: #d1c5c5; line-height: 1.55; }
   .deck-builder { padding-bottom: 88px; }
   .deck-layout { grid-template-columns: minmax(0, 1fr); }
   .collection-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .deck-panel { display: none; position: fixed; inset: auto 12px 68px; z-index: 3; max-height: calc(100dvh - 90px); }
+  .deck-panel { display: none; position: fixed; inset: auto 12px 68px; z-index: 3; max-height: calc(100dvh - 90px); background: rgb(33 28 34 / var(--popup-alpha)); }
   .deck-panel.is-open { display: block; }
   #deck-toggle { display: block; position: fixed; width: calc(100% - 24px); bottom: 12px; left: 12px; z-index: 4; }
 }

@@ -240,8 +240,8 @@ export const CharacterList: CharacterListType = {
     Ghost: {
         name: Characters.Ghost,
         cover: Characters.Ghost.toLowerCase(),
-        attack: 3,
-        health: 5,
+        attack: 2,
+        health: 2,
         rarity: Rarity.Common,
         color: Color.Common,
         attackType: AttackType.Ranged,
